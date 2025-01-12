@@ -157,9 +157,10 @@ class EnvLoadRL(gym.Env):
         obs = np.array([current_norm, reference_norm], dtype=np.float32)
         return obs, {}
 
+
 if __name__ == "__main__":
     # Environment
-    sys_params_dict = {"dt":1/10e3, "r": 1, "l": 1e-2, "vdc": 500}
+    sys_params_dict = {"dt": 1/10e3, "r": 1, "l": 1e-2, "vdc": 500}
     env_test = EnvLoadRL(sys_params=sys_params_dict)
     env_test.reset()
     env_test.step(action=env_test.action_space.sample())
