@@ -6,7 +6,8 @@
 Installation instructions.
 
 (are these correct? Which python version?)
-(also, would be best to add your exact version for packages in requirements.txt)
+
+(also, would be best to add the exact version you're using for packages in requirements.txt)
 
 ```bash
 conda create -n siso python=3.9
