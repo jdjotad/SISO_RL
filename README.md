@@ -5,12 +5,8 @@
 
 Installation instructions.
 
-(are these correct? Which python version?)
-
-(also, would be best to add the exact version you're using for packages in requirements.txt)
-
 ```bash
-conda create -n siso python=3.9
+conda create -n siso python=3.12
 conda activate siso
 pip install -r requirements.txt
 ```
