@@ -52,9 +52,11 @@ class EnvLoadRLConst(gym.Env):
     def step(self, action: np.ndarray):
         state = self.state
 
+        if action[0] > 1 or action[0] < -1:
+            breakpoint()
         action_input = self.vdc * action[0]     # Denormalize action
-        next_state   = self.ad * state + self.bd * action_input
-        next_state_norm = np.clip(next_state/self.i_max, self.min_state, self.max_state)
+        next_state   = np.clip(self.ad * state + self.bd * action_input, -self.i_max, self.i_max)
+        next_state_norm = next_state/self.i_max
 
         terminated = False
 
@@ -68,8 +70,8 @@ class EnvLoadRLConst(gym.Env):
     def reset(self, *, seed = None, options = None):
         super().reset(seed=seed)
 
-        low, high = [-1, 1]
-        state_norm      = self.np_random.uniform(low=low, high=high)
+        low, high = [-0.9, 0.9]
+        state_norm      = np.round(self.np_random.uniform(low=low, high=high),6)
         self.state      = self.i_max * state_norm
         self.reference  = 0
 
@@ -127,14 +129,15 @@ class EnvLoadRL(gym.Env):
         action_input = self.vdc * action[0]  # Denormalize action
 
         current             = self.current
-        next_current        = self.ad * current + self.bd * action_input
-        next_current_norm   = np.clip(next_current/self.i_max, self.min_current, self.max_current)
+        next_current        = np.clip(self.ad * current + self.bd * action_input, -self.i_max, self.i_max)
 
-        reference_norm = self.reference / self.i_max
+        next_current_norm   = next_current/self.i_max
+        current_norm        = current/self.i_max
+        reference_norm      = self.reference / self.i_max
 
         terminated = False
 
-        reward = -np.power(current - self.reference, 2)
+        reward = -np.power(current_norm - reference_norm, 2)
 
         # Observation: [current, reference]
         obs = np.array([next_current_norm, reference_norm], dtype=np.float32)
@@ -147,20 +150,19 @@ class EnvLoadRL(gym.Env):
     def reset(self, *, seed = None, options = None):
         super().reset(seed=seed)
 
-        low, high = [-1, 1]
-        current_norm    = self.np_random.uniform(low=low, high=high)
-        low, high = [-0.1, 0.1]
-        reference_norm  = self.np_random.uniform(low=low, high=high)
+        low, high = [-0.9, 0.9]
+        current_norm    = np.round(self.np_random.uniform(low=low, high=high),6)
+        low, high = [-0.9, 0.9]
+        reference_norm  = np.round(self.np_random.uniform(low=low, high=high),6)
         self.current    = self.i_max * current_norm
         self.reference  = self.i_max * reference_norm
 
         obs = np.array([current_norm, reference_norm], dtype=np.float32)
         return obs, {}
 
-
 if __name__ == "__main__":
     # Environment
-    sys_params_dict = {"dt": 1/10e3, "r": 1, "l": 1e-2, "vdc": 500}
+    sys_params_dict = {"dt":1/10e3, "r": 1, "l": 1e-2, "vdc": 500}
     env_test = EnvLoadRL(sys_params=sys_params_dict)
     env_test.reset()
     env_test.step(action=env_test.action_space.sample())
