@@ -16,7 +16,7 @@ pip install -r requirements.txt
 How to train an RL agent.
 
 ```bash
-python test_Load_RL.py
+python train.py
 ```
 
 
