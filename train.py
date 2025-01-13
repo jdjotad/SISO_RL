@@ -12,14 +12,14 @@ from stable_baselines3.common.noise import NormalActionNoise, OrnsteinUhlenbeckA
 plt.show()
 
 sys_params_dict = {"dt": 1 / 10e3, "r": 1, "l": 1e-2, "vdc": 500}
-env_const = True
+env_const = False
 if env_const:
     max_episode_steps = 500
     max_episodes = 200
     env = EnvLoadRLConst(sys_params=sys_params_dict)
 else:
-    max_episode_steps = 1000
-    max_episodes = 1000
+    max_episode_steps = 500
+    max_episodes = 10000
     env = EnvLoadRL(sys_params=sys_params_dict)
 
 env = gym.wrappers.TimeLimit(env, max_episode_steps)
@@ -28,7 +28,7 @@ env = gym.wrappers.TimeLimit(env, max_episode_steps)
 n_actions = env.action_space.shape[-1]
 action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=0.1 * np.ones(n_actions))
 
-model = DDPG("MlpPolicy", env=env, action_noise=action_noise, verbose=1, device="cpu")
+model = DDPG("MlpPolicy", env=env, action_noise=action_noise, verbose=1)
 vec_env = model.get_env()
 
 train, test = (True, True)
@@ -43,7 +43,8 @@ obs = vec_env.reset()
 test_max_episodes = 10
 for episode in range(test_max_episodes):
     action_list = []
-    state_list  = [obs[0][0]]
+    reward_list = []
+    state_list  = [obs[0]]
 
     # plt.figure(episode, figsize=(30, 5))
     plt.figure(episode)
@@ -53,16 +54,21 @@ for episode in range(test_max_episodes):
         obs, rewards, done, info = vec_env.step(action)
         if not done:
             action_list.append(action[0][0])
-            state_list.append(obs[0][0])
+            state_list.append(obs[0])
+            reward_list.append(rewards[0])
 
     plt.clf()
     # Plot State
-    plt.subplot(121)
+    plt.subplot(131)
     plt.title("State vs step")
     plt.plot(state_list)
     # Plot action
-    plt.subplot(122)
+    plt.subplot(132)
     plt.title("Action vs step")
     plt.plot(action_list)
+    # Plot reward
+    plt.subplot(133)
+    plt.title("Reward vs step")
+    plt.plot(reward_list)
 
     plt.pause(0.001)  # pause a bit so that plots are updated
