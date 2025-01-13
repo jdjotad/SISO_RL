@@ -1,5 +1,5 @@
 numpy==1.26.4
-scipy
-gymnasium
-matplotlib
-stable-baselines3[extra]
+scipy==1.15.1
+gymnasium==1.0.0
+matplotlib==3.9.2
+stable-baselines3[extra]==2.4.1
