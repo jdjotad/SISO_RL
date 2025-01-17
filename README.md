@@ -2,8 +2,6 @@
 
 (let's add wandb tracking, very nice to have in an RL repo)
 
-(see Issues here on github. I can't msg you on Teams / email now :p. Feel free to reply there)
-
 ## Install 
 
 Installation instructions.
@@ -16,10 +14,16 @@ pip install -r requirements.txt
 
 ## Run
 
-How to train an RL agent.
+How to train an RL agent considering a single input single output system.
 
 ```bash
-python train.py
+python train_siso.py
+```
+
+How to train an RL agent considering a multiple input multiple output system (two inputs and two outputs for this example)..
+
+```bash
+python train_mimo.py
 ```
 
 

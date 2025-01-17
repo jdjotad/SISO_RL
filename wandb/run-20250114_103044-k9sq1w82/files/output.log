@@ -1,0 +1,7 @@
+Using cuda device
+Wrapping the env with a `Monitor` wrapper
+Wrapping the env in a DummyVecEnv.
+Traceback (most recent call last):
+  File "/home/jd/Dropbox/TUe/Articles/SISO_RL/train.py", line 53, in <module>
+    model.learn(total_timesteps=config["total_timesteps"], log_interval=10, progress_bar=True, verbose=1, tensorboard_log=f"runs/ddpg")
+TypeError: DDPG.learn() got an unexpected keyword argument 'verbose'

@@ -1,0 +1,247 @@
+_current_progress_remaining:
+    value: 1
+_custom_logger:
+    value: "False"
+_episode_num:
+    value: 0
+_episode_storage:
+    value: None
+_last_episode_starts:
+    value: '[ True]'
+_last_obs:
+    value: '[[0.37814 0.36721]]'
+_last_original_obs:
+    value: None
+_logger:
+    value: <stable_baselines3.common.logger.Logger object at 0x7457bd85fad0>
+_n_updates:
+    value: 0
+_num_timesteps_at_start:
+    value: 0
+_stats_window_size:
+    value: 100
+_total_timesteps:
+    value: 500000
+_vec_normalize_env:
+    value: None
+_wandb:
+    value:
+        cli_version: 0.19.2
+        code_path: code/train_siso.py
+        m: []
+        python_version: 3.12.3
+        t:
+            "1":
+                - 1
+                - 55
+            "2":
+                - 1
+                - 55
+            "3":
+                - 16
+                - 22
+                - 23
+                - 35
+                - 55
+            "4": 3.12.3
+            "5": 0.19.2
+            "8":
+                - 5
+            "12": 0.19.2
+            "13": linux-x86_64
+action_noise:
+    value: NormalActionNoise(mu=[0.], sigma=[0.1])
+action_space:
+    value: Box(-1.0, 1.0, (1,), float32)
+actor:
+    value: |-
+        Actor(
+          (features_extractor): FlattenExtractor(
+            (flatten): Flatten(start_dim=1, end_dim=-1)
+          )
+          (mu): Sequential(
+            (0): Linear(in_features=2, out_features=400, bias=True)
+            (1): ReLU()
+            (2): Linear(in_features=400, out_features=300, bias=True)
+            (3): ReLU()
+            (4): Linear(in_features=300, out_features=1, bias=True)
+            (5): Tanh()
+          )
+        )
+actor_batch_norm_stats:
+    value: '[]'
+actor_batch_norm_stats_target:
+    value: '[]'
+actor_target:
+    value: |-
+        Actor(
+          (features_extractor): FlattenExtractor(
+            (flatten): Flatten(start_dim=1, end_dim=-1)
+          )
+          (mu): Sequential(
+            (0): Linear(in_features=2, out_features=400, bias=True)
+            (1): ReLU()
+            (2): Linear(in_features=400, out_features=300, bias=True)
+            (3): ReLU()
+            (4): Linear(in_features=300, out_features=1, bias=True)
+            (5): Tanh()
+          )
+        )
+algo:
+    value: DDPG
+batch_size:
+    value: 256
+buffer_size:
+    value: 1000000
+critic:
+    value: |-
+        ContinuousCritic(
+          (features_extractor): FlattenExtractor(
+            (flatten): Flatten(start_dim=1, end_dim=-1)
+          )
+          (qf0): Sequential(
+            (0): Linear(in_features=3, out_features=400, bias=True)
+            (1): ReLU()
+            (2): Linear(in_features=400, out_features=300, bias=True)
+            (3): ReLU()
+            (4): Linear(in_features=300, out_features=1, bias=True)
+          )
+        )
+critic_batch_norm_stats:
+    value: '[]'
+critic_batch_norm_stats_target:
+    value: '[]'
+critic_target:
+    value: |-
+        ContinuousCritic(
+          (features_extractor): FlattenExtractor(
+            (flatten): Flatten(start_dim=1, end_dim=-1)
+          )
+          (qf0): Sequential(
+            (0): Linear(in_features=3, out_features=400, bias=True)
+            (1): ReLU()
+            (2): Linear(in_features=400, out_features=300, bias=True)
+            (3): ReLU()
+            (4): Linear(in_features=300, out_features=1, bias=True)
+          )
+        )
+device:
+    value: cuda
+env:
+    value: <stable_baselines3.common.vec_env.dummy_vec_env.DummyVecEnv object at 0x7457bd8154f0>
+env_name:
+    value: RL Variable Reference
+ep_info_buffer:
+    value: deque([], maxlen=100)
+ep_success_buffer:
+    value: deque([], maxlen=100)
+gamma:
+    value: 0.99
+gradient_steps:
+    value: 1
+learning_rate:
+    value: 0.001
+learning_starts:
+    value: 100
+lr_schedule:
+    value: <function get_schedule_fn.<locals>.<lambda> at 0x7457bd872c00>
+n_envs:
+    value: 1
+num_timesteps:
+    value: 0
+observation_space:
+    value: Box(-1.0, 1.0, (2,), float32)
+optimize_memory_usage:
+    value: "False"
+policy:
+    value: |-
+        TD3Policy(
+          (actor): Actor(
+            (features_extractor): FlattenExtractor(
+              (flatten): Flatten(start_dim=1, end_dim=-1)
+            )
+            (mu): Sequential(
+              (0): Linear(in_features=2, out_features=400, bias=True)
+              (1): ReLU()
+              (2): Linear(in_features=400, out_features=300, bias=True)
+              (3): ReLU()
+              (4): Linear(in_features=300, out_features=1, bias=True)
+              (5): Tanh()
+            )
+          )
+          (actor_target): Actor(
+            (features_extractor): FlattenExtractor(
+              (flatten): Flatten(start_dim=1, end_dim=-1)
+            )
+            (mu): Sequential(
+              (0): Linear(in_features=2, out_features=400, bias=True)
+              (1): ReLU()
+              (2): Linear(in_features=400, out_features=300, bias=True)
+              (3): ReLU()
+              (4): Linear(in_features=300, out_features=1, bias=True)
+              (5): Tanh()
+            )
+          )
+          (critic): ContinuousCritic(
+            (features_extractor): FlattenExtractor(
+              (flatten): Flatten(start_dim=1, end_dim=-1)
+            )
+            (qf0): Sequential(
+              (0): Linear(in_features=3, out_features=400, bias=True)
+              (1): ReLU()
+              (2): Linear(in_features=400, out_features=300, bias=True)
+              (3): ReLU()
+              (4): Linear(in_features=300, out_features=1, bias=True)
+            )
+          )
+          (critic_target): ContinuousCritic(
+            (features_extractor): FlattenExtractor(
+              (flatten): Flatten(start_dim=1, end_dim=-1)
+            )
+            (qf0): Sequential(
+              (0): Linear(in_features=3, out_features=400, bias=True)
+              (1): ReLU()
+              (2): Linear(in_features=400, out_features=300, bias=True)
+              (3): ReLU()
+              (4): Linear(in_features=300, out_features=1, bias=True)
+            )
+          )
+        )
+policy_class:
+    value: <class 'stable_baselines3.td3.policies.TD3Policy'>
+policy_delay:
+    value: 1
+policy_kwargs:
+    value: '{''n_critics'': 1}'
+policy_type:
+    value: MlpPolicy
+replay_buffer:
+    value: <stable_baselines3.common.buffers.ReplayBuffer object at 0x7457bdb7e240>
+replay_buffer_class:
+    value: <class 'stable_baselines3.common.buffers.ReplayBuffer'>
+replay_buffer_kwargs:
+    value: '{}'
+sde_sample_freq:
+    value: -1
+seed:
+    value: None
+start_time:
+    value: 1736844938287600602
+target_noise_clip:
+    value: 0
+target_policy_noise:
+    value: 0.1
+tau:
+    value: 0.005
+tensorboard_log:
+    value: None
+total_timesteps:
+    value: 500000
+train_freq:
+    value: 'TrainFreq(frequency=1, unit=<TrainFrequencyUnit.STEP: ''step''>)'
+use_sde:
+    value: "False"
+use_sde_at_warmup:
+    value: "False"
+verbose:
+    value: 1

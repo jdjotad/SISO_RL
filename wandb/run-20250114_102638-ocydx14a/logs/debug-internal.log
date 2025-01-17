@@ -1,0 +1,15 @@
+{"time":"2025-01-14T10:26:39.180420287+01:00","level":"INFO","msg":"stream: starting","core version":"0.19.2","symlink path":"/home/jd/Dropbox/TUe/Articles/SISO_RL/wandb/run-20250114_102638-ocydx14a/logs/debug-core.log"}
+{"time":"2025-01-14T10:26:39.28720238+01:00","level":"INFO","msg":"created new stream","id":"ocydx14a"}
+{"time":"2025-01-14T10:26:39.287232916+01:00","level":"INFO","msg":"stream: started","id":"ocydx14a"}
+{"time":"2025-01-14T10:26:39.287321615+01:00","level":"INFO","msg":"handler: started","stream_id":"ocydx14a"}
+{"time":"2025-01-14T10:26:39.287355424+01:00","level":"INFO","msg":"writer: Do: started","stream_id":"ocydx14a"}
+{"time":"2025-01-14T10:26:39.28736191+01:00","level":"INFO","msg":"sender: started","stream_id":"ocydx14a"}
+{"time":"2025-01-14T10:26:39.541261748+01:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2025-01-14T10:30:38.487842534+01:00","level":"INFO","msg":"stream: closing","id":"ocydx14a"}
+{"time":"2025-01-14T10:30:38.487860544+01:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2025-01-14T10:30:38.488166301+01:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2025-01-14T10:30:39.333215996+01:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2025-01-14T10:30:39.511774088+01:00","level":"INFO","msg":"handler: closed","stream_id":"ocydx14a"}
+{"time":"2025-01-14T10:30:39.511791927+01:00","level":"INFO","msg":"writer: Close: closed","stream_id":"ocydx14a"}
+{"time":"2025-01-14T10:30:39.511806957+01:00","level":"INFO","msg":"sender: closed","stream_id":"ocydx14a"}
+{"time":"2025-01-14T10:30:39.511848409+01:00","level":"INFO","msg":"stream: closed","id":"ocydx14a"}

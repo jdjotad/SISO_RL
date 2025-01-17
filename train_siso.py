@@ -14,12 +14,15 @@ from stable_baselines3.common.noise import NormalActionNoise, OrnsteinUhlenbeckA
 # plt.ion()
 plt.show()
 
+env_const = False           # Constant reference environment
+train, test = (False, True) # Training and/or Testing
+
 sys_params_dict = {"dt": 1 / 10e3, "r": 1, "l": 1e-2, "vdc": 500}
-env_const = False
 if env_const:
     max_episode_steps = 500
     max_episodes = 200
     env = EnvLoadRLConst(sys_params=sys_params_dict)
+
 else:
     max_episode_steps = 750
     max_episodes = 1000
@@ -48,12 +51,11 @@ action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=0.1 * np.ones(n
 model = DDPG("MlpPolicy", env=env, action_noise=action_noise, verbose=1, tensorboard_log=f"runs/ddpg")
 vec_env = model.get_env()
 
-train, test = (False, True)
 if train:
     model.learn(total_timesteps=config["total_timesteps"], log_interval=10, progress_bar=True)
-    model.save("ddpg_EnvLoadRL")
+    model.save("ddpg_EnvLoadRLConst" if env_const else "ddpg_EnvLoadRL")
 if test:
-    model = DDPG.load("ddpg_EnvLoadRL")
+    model = DDPG.load("ddpg_EnvLoadRLConst" if env_const else "ddpg_EnvLoadRL")
 
 obs = vec_env.reset()
 
