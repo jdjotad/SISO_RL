@@ -2,6 +2,9 @@ import gymnasium as gym
 import numpy as np
 import matplotlib.pyplot as plt
 
+import wandb
+from wandb.integration.sb3 import WandbCallback
+
 from environments import EnvLoadRL, EnvLoadRLConst
 
 from stable_baselines3 import DDPG
@@ -18,22 +21,36 @@ if env_const:
     max_episodes = 200
     env = EnvLoadRLConst(sys_params=sys_params_dict)
 else:
-    max_episode_steps = 500
-    max_episodes = 10000
+    max_episode_steps = 750
+    max_episodes = 1000
     env = EnvLoadRL(sys_params=sys_params_dict)
 
 env = gym.wrappers.TimeLimit(env, max_episode_steps)
+env = gym.wrappers.RecordEpisodeStatistics(env)
+
+# Wandb
+config = {
+    "policy_type": "MlpPolicy",
+    "total_timesteps": max_episodes*max_episode_steps,
+    "env_name": "RL Constant Reference" if env_const else "RL Variable Reference",
+}
+# run = wandb.init(
+#     project="sb3",
+#     config=config,
+#     sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
+#     save_code=True,  # optional
+# )
 
 # The noise objects for DDPG
 n_actions = env.action_space.shape[-1]
 action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=0.1 * np.ones(n_actions))
 
-model = DDPG("MlpPolicy", env=env, action_noise=action_noise, verbose=1)
+model = DDPG("MlpPolicy", env=env, action_noise=action_noise, verbose=1, tensorboard_log=f"runs/ddpg")
 vec_env = model.get_env()
 
-train, test = (True, True)
+train, test = (False, True)
 if train:
-    model.learn(total_timesteps=max_episodes*max_episode_steps, log_interval=10, progress_bar=True)
+    model.learn(total_timesteps=config["total_timesteps"], log_interval=10, progress_bar=True)
     model.save("ddpg_EnvLoadRL")
 if test:
     model = DDPG.load("ddpg_EnvLoadRL")
