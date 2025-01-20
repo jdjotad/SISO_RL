@@ -23,7 +23,7 @@ python train_siso.py
 How to train an RL agent considering a multiple input multiple output system (two inputs and two outputs for this example)..
 
 ```bash
-python train_mimo.py
+python train_mimo_var_speed.py
 ```
 
 

@@ -14,8 +14,8 @@ from stable_baselines3.common.noise import NormalActionNoise, OrnsteinUhlenbeckA
 # plt.ion()
 plt.show()
 
-env_const = False           # Constant reference environment
-train, test = (False, True) # Training and/or Testing
+env_const = True           # Constant reference environment
+train, test = (True, True) # Training and/or Testing
 
 sys_params_dict = {"dt": 1 / 10e3, "r": 1, "l": 1e-2, "vdc": 500}
 if env_const:
@@ -57,10 +57,10 @@ if train:
 if test:
     model = DDPG.load("ddpg_EnvLoadRLConst" if env_const else "ddpg_EnvLoadRL")
 
-obs = vec_env.reset()
-
 test_max_episodes = 10
 for episode in range(test_max_episodes):
+    obs = vec_env.reset()
+
     action_list = []
     reward_list = []
     state_list  = [obs[0]]

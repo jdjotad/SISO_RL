@@ -46,3 +46,5 @@ class ClarkePark:
         b = d * np.sin(wt - (2 * np.pi / 3) + delta) + q * np.cos(wt - (2 * np.pi / 3) + delta) + z
         c = d * np.sin(wt + (2 * np.pi / 3) + delta) + q * np.cos(wt + (2 * np.pi / 3) + delta) + z
         return a, b, c
+
+# def plot_results():
