@@ -3,34 +3,92 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import wandb
-from wandb.integration.sb3 import WandbCallback
+import argparse
 
-from environments import EnvLoad3RLConstRef, EnvLoad3RLConstRefDeltaVdq
+from environments import (EnvLoad3RLConstRefConstSpeed,
+                          EnvLoad3RLConstRef,
+                          EnvLoad3RLConstRefDeltaVdq,
+                          EnvLoad3RLConstSpeed,
+                          EnvLoad3RLConstSpeedDeltaVdq,
+                          EnvLoad3RLDeltaVdq,)
 
 from stable_baselines3 import DDPG
 from stable_baselines3.common.noise import NormalActionNoise, OrnsteinUhlenbeckActionNoise
+
+# CLI Input
+parser = argparse.ArgumentParser()
+parser.add_argument("env_number", nargs='?', type=int, const=0, default=0)
+env_number = parser.parse_args().env_number
+
+# Training and/or Testing
+train, test = (False, True)
 
 # set up matplotlib
 # plt.ion()
 plt.show()
 
-sys_params_dict = {"dt": 1 / 10e3, "r": 1, "l": 1e-2, "vdc": 500, "we_nom": 400*np.pi}
+sys_params_dict = {"dt": 1 / 10e3,      # Sampling time [s]
+                   "r": 1,              # Resistance [Ohm]
+                   "l": 1e-2,           # Inductance [H]
+                   "vdc": 500,          # DC bus voltage [V]
+                   "we_nom": 400*np.pi, # Nominal speed
+                   "we_norm_const": 0,  # Constant speed value [rad/s] ; [-0.9, 0.9]
+                   "id_ref_norm_const": 0,  # Constant id value [A] ; [-0.9, 0.9]
+                   "iq_ref_norm_const": 0,  # Constant iq value [A] ; [-0.9, 0.9]
+                   }
 
-environments = {0: {"env": EnvLoad3RLConstRef,
+environments = {0: {"env": EnvLoad3RLConstRefConstSpeed,
+                    "name": "3-Phase RL Constant Reference Constant Speed",
+                    "max_episode_steps": 500,
+                    "max_episodes": 500,
+                    "tolerance": 1e-4,
+                    "model_name": "ddpg_EnvLoad3RLConstRefConstSpeed"
+                    },
+                1: {"env": EnvLoad3RLConstRef,
                     "name": "3-Phase RL Constant Reference",
                     "max_episode_steps": 500,
-                    "max_episodes": 200,
+                    "max_episodes": 500,
+                    "tolerance": 1e-4,
                     "model_name": "ddpg_EnvLoad3RLConstRef"
                     },
-                1: {"env": EnvLoad3RLConstRefDeltaVdq,
+                2: {"env": EnvLoad3RLConstRefDeltaVdq,
                     "name": "3-Phase RL Constant Reference / Delta Vdq penalty",
                     "max_episode_steps": 500,
-                    "max_episodes": 200,
+                    "max_episodes": 500,
+                    "tolerance": 1e-5,
                     "model_name": "ddpg_EnvLoad3RLConstRefDeltaVdq"
-                    },}
+                    },
+                3: {"env": EnvLoad3RLConstSpeed,
+                    "name": "3-Phase RL Constant Speed",
+                    "max_episode_steps": 500,
+                    "max_episodes": 1000,
+                    "tolerance": 1e-4,
+                    "model_name": "ddpg_EnvLoad3RLConstSpeed"
+                    },
+                4: {"env": EnvLoad3RLConstSpeedDeltaVdq,
+                    "name": "3-Phase RL Constant Speed / Delta Vdq penalty",
+                    "max_episode_steps": 500,
+                    "max_episodes": 1000,
+                    "tolerance": 1e-4,
+                    "model_name": "ddpg_EnvLoad3RLConstSpeedDeltaVdq"
+                    },
+                5: {"env": EnvLoad3RLDeltaVdq,
+                    "name": "3-Phase RL / Delta Vdq penalty",
+                    "max_episode_steps": 750,
+                    "max_episodes": 1000,
+                    "tolerance": 1e-4,
+                    "model_name": "ddpg_EnvLoad3RLDeltaVdq"
+                    },
+                }
 
-env_sel = environments[0]   # Choose Environment to test
-train, test = (True, True)  # Training and/or Testing
+if env_number not in environments.keys():
+    print(f"Environment number not recognized, choose between {list(environments.keys())[0]} and {list(environments.keys())[-1]}")
+    exit(-1)
+env_sel = environments[env_number]   # Choose Environment to test
+print(f"Running: {env_sel['name']}")
+print(f"Model: {env_sel['model_name']}")
+
+sys_params_dict["tolerance"] = env_sel["tolerance"]     # Store tolerance value in sys_params
 
 env = env_sel["env"](sys_params=sys_params_dict)
 env = gym.wrappers.TimeLimit(env, env_sel["max_episode_steps"])
@@ -68,7 +126,7 @@ for episode in range(test_max_episodes):
 
     action_list = []
     reward_list = []
-    state_list  = [obs[0][0:4]]
+    state_list  = [obs[0][0:4] if len(obs[0]) > 4 else obs[0]]
 
     # plt.figure(episode, figsize=(30, 5))
     plt.figure(episode)
@@ -78,11 +136,12 @@ for episode in range(test_max_episodes):
         obs, rewards, done, info = vec_env.step(action)
         if not done:
             action_list.append(action[0])
-            state_list.append(obs[0][0:4])
+            state_list.append(obs[0][0:4] if len(obs[0]) > 4 else obs[0])
             reward_list.append(rewards[0])
 
     plt.clf()
-    plt.suptitle(f"Speed = {sys_params_dict["we_nom"]*obs[0][-1]} [rad/s]",)
+    if len(obs[0]) > 4:
+        plt.suptitle(f"Speed = {sys_params_dict['we_nom']*obs[0][4]} [rad/s]",)
     # Plot State
     plt.subplot(131)
     plt.title("State vs step")

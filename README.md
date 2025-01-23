@@ -1,7 +1,5 @@
 # SISO_RL
 
-(let's add wandb tracking, very nice to have in an RL repo)
-
 ## Install 
 
 Installation instructions.
