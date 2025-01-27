@@ -21,7 +21,7 @@ parser.add_argument("env_number", nargs='?', type=int, const=0, default=0)
 env_number = parser.parse_args().env_number
 
 # Training and/or Testing
-train, test = (False, True)
+train, test = (True, True)
 
 # set up matplotlib
 # plt.ion()
@@ -75,8 +75,8 @@ environments = {0: {"env": EnvLoad3RLConstRefConstSpeed,
                 5: {"env": EnvLoad3RLDeltaVdq,
                     "name": "3-Phase RL / Delta Vdq penalty",
                     "max_episode_steps": 750,
-                    "max_episodes": 1000,
-                    "tolerance": 1e-4,
+                    "max_episodes": 10000,
+                    "tolerance": 1e-5,
                     "model_name": "ddpg_EnvLoad3RLDeltaVdq"
                     },
                 }
@@ -100,12 +100,12 @@ config = {
     "total_timesteps": env_sel["max_episodes"]*env_sel["max_episode_steps"],
     "env_name": env_sel["name"],
 }
-# run = wandb.init(
-#     project="sb3",
-#     config=config,
-#     sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
-#     save_code=True,  # optional
-# )
+run = wandb.init(
+    project="sb3",
+    config=config,
+    sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
+    save_code=True,  # optional
+)
 
 # The noise objects for DDPG
 n_actions = env.action_space.shape[-1]
