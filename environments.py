@@ -5,6 +5,8 @@ from gymnasium import spaces
 
 from typing import Any, SupportsFloat
 
+from numpy import ndarray
+import matplotlib.pyplot as plt
 from utils import *
 
 # Resistive Inductive Load Environment with constant reference
@@ -196,7 +198,7 @@ class EnvLoad3RLConstRefConstSpeed(gym.Env):
         self.vdq_max = np.sqrt(2) * vdc / 4
 
         # Maximum current [A]
-        self.i_max = (vdc / 2) / np.sqrt(np.power(self.r, 2) + np.power(self.we * self.l, 2))
+        self.i_max = self.vdq_max / np.sqrt(np.power(self.r, 2) + np.power(self.we * self.l, 2))
 
         #  ----- Maximum current analysis -----
         # dx/dt = a*x + b*u
@@ -1086,6 +1088,8 @@ class EnvLoad3RLConstSpeedDeltaVdq(gym.Env):
         # Update states
         self.id = id_next
         self.iq = iq_next
+        self.prev_vd = action_vdq[0]
+        self.prev_vq = action_vdq[1]
 
         self.counter += 1
 
@@ -1253,13 +1257,19 @@ class EnvLoad3RLDeltaVdq(gym.Env):
         delta_vd = np.power(action[0] - prev_vd_norm, 2)
         delta_vq = np.power(action[1] - prev_vq_norm, 2)
         additional_reward = 0
-        if tracking_error_id <= self.tol and tracking_error_iq <= self.tol:
+        # if tracking_error_id <= self.tol and tracking_error_iq <= self.tol:
+        # if tracking_error_id <= np.power(0.05*id_ref_norm,2) and tracking_error_iq <= np.power(0.05*iq_ref_norm,2):
+        # if tracking_error_id <= np.power(0.1*id_ref_norm, 2) and tracking_error_iq <= np.power(0.1*iq_ref_norm,2):
+        # if tracking_error_id <= np.power(0.15*id_ref_norm, 2) and tracking_error_iq <= np.power(0.15*iq_ref_norm,2):
+        if tracking_error_id <= np.power(0.2*id_ref_norm, 2) and tracking_error_iq <= np.power(0.2*iq_ref_norm,2):
             additional_reward = 1
-        reward = -((tracking_error_id + tracking_error_iq) + 0.5*(delta_vd + delta_vq)) + additional_reward
+        reward = -((tracking_error_id + tracking_error_iq) + 0.1*(delta_vd + delta_vq)) + additional_reward
 
         # Update states
         self.id = id_next
         self.iq = iq_next
+        self.prev_vd = action_vdq[0]
+        self.prev_vq = action_vdq[1]
 
         return obs, reward, terminated, False, {}
 
@@ -1269,7 +1279,8 @@ class EnvLoad3RLDeltaVdq(gym.Env):
         low, high = 0.9 * np.array([-1, 1])
         # Initialization
         # [we]
-        we_norm = np.round(self.np_random.uniform(low=low, high=high), 5)
+        # we_norm = np.round(self.np_random.uniform(low=low, high=high), 5)
+        we_norm = 0.5
         # Redefine maximum and minimum current values depending on speed
         we = we_norm * self.we_nom
         current_limit = self.idq_max_norm(we)
@@ -1325,6 +1336,302 @@ class EnvLoad3RLDeltaVdq(gym.Env):
                        dtype=np.float32)
         return obs, {}
 
+class EnvPMSM(gym.Env):
+    def __init__(self, sys_params, render_mode = None):
+        # System parameters
+        self.dt     = sys_params["dt"]      # Simulation step time [s]
+        self.r      = sys_params["r"]       # Phase Stator Resistance [Ohm]
+        self.ld     = sys_params["ld"]      # D-axis Inductance [H]
+        self.lq     = sys_params["lq"]      # Q-axis Inductance [H]
+        self.lambda_PM = sys_params["lambda_PM"]  # Flux-linkage due to permanent magnets [Wb]
+        self.we_nom = sys_params["we_nom"]  # Nominal speed [rad/s]
+        vdc         = sys_params["vdc"]     # DC bus voltage [V]
+
+        # Maximum voltage [V]
+        self.vdq_max = vdc/2
+
+        # Maximum current [A]
+        self.i_max  = sys_params["i_max"]
+
+        # Band tolerance for additional reward
+        self.tol = sys_params["tolerance"]
+
+        # Limitations for the system
+        # Actions
+        self.min_vd, self.max_vd = [-1.0, 1.0]
+        self.min_vq, self.max_vq = [-1.0, 1.0]
+
+        self.low_actions = np.array(
+            [self.min_vd, self.min_vq], dtype=np.float32
+        )
+        self.high_actions = np.array(
+            [self.max_vd, self.max_vq], dtype=np.float32
+        )
+
+        # Observations
+        self.min_id,     self.max_id     = [-1.0, 1.0]
+        self.min_iq,     self.max_iq     = [-1.0, 1.0]
+        self.min_ref_id, self.max_ref_id = [-1.0, 1.0]
+        self.min_ref_iq, self.max_ref_iq = [-1.0, 1.0]
+        self.min_we,     self.max_we     = [-1.0, 1.0]
+        self.min_vd,     self.max_vd     = [-1.0, 1.0]
+        self.min_vq,     self.max_vq     = [-1.0, 1.0]
+
+        self.low_observations = np.array(
+            [self.min_id, self.min_iq, self.min_ref_id, self.min_ref_iq, self.min_we, self.min_vd, self.min_vq], dtype=np.float32
+        )
+        self.high_observations = np.array(
+            [self.max_id, self.max_iq, self.max_ref_id, self.max_ref_iq, self.max_we, self.max_vd, self.max_vq], dtype=np.float32
+        )
+
+        # Render mode
+        self.render_mode = render_mode
+
+        # Define action and observation space within a Box property
+        self.action_space = spaces.Box(
+            low=self.low_actions, high=self.high_actions, shape=(2,), dtype=np.float32
+        )
+        self.observation_space = spaces.Box(
+            low=self.low_observations, high=self.high_observations, shape=(7,), dtype=np.float32
+        )
+
+    def step(self, action: np.ndarray):
+        action_vdq = self.vdq_max * action  # Denormalize action
+
+        # Calculate if that the module of Vdq is bigger than 1
+        norm_vdq = np.sqrt(np.power(action_vdq[0], 2) + np.power(action_vdq[0], 2))
+        # factor_vdq = self.vdq_max / norm_vdq
+        # factor_vdq = factor_vdq if factor_vdq < 1 else 1
+        factor_vdq = 1
+
+        s_t = np.array([self.id,
+                        self.iq])
+        a_t = factor_vdq * action_vdq
+
+        # s(t+1) = ad * s(t) + bd * a(t) + w
+        id_next, iq_next = self.ad @ s_t + self.bd @ a_t + self.wd
+        # Rescale the current states to limit it within the boundaries if needed
+        norm_idq_next = np.sqrt(np.power(id_next, 2) + np.power(iq_next, 2))
+        factor_idq = self.i_max / norm_idq_next
+        factor_idq = factor_idq if factor_idq < 1 else 1
+        id_next, iq_next = factor_idq * np.array([id_next, iq_next])
+
+        # Normalize observation
+        id_next_norm = id_next / self.i_max
+        iq_next_norm = iq_next / self.i_max
+        id_ref_norm  = self.id_ref / self.i_max
+        iq_ref_norm  = self.iq_ref / self.i_max
+        we_norm      = self.we / self.we_nom
+        prev_vd_norm = self.prev_vd / self.vdq_max
+        prev_vq_norm = self.prev_vd / self.vdq_max
+        # Observation: [id, iq, id_ref, iq_ref, we, prev_vd, prev_vq]
+        obs = np.array([id_next_norm, iq_next_norm,  id_ref_norm, iq_ref_norm, we_norm, prev_vd_norm, prev_vq_norm], dtype=np.float32)
+
+        terminated = False
+
+        # Reward function
+        id_norm = self.id / self.i_max
+        iq_norm = self.iq / self.i_max
+        tracking_error_id = np.power(id_norm - id_ref_norm, 2)
+        tracking_error_iq = np.power(iq_norm - iq_ref_norm, 2)
+        delta_vd = np.power(action[0] - prev_vd_norm, 2)
+        delta_vq = np.power(action[1] - prev_vq_norm, 2)
+        additional_reward = 0
+        out_of_bounds_penalty = 0
+        # if tracking_error_id <= self.tol and tracking_error_iq <= self.tol:
+        if tracking_error_id <= np.power(0.05*id_ref_norm,2) and tracking_error_iq <= np.power(0.05*iq_ref_norm,2):
+        # if tracking_error_id <= np.power(0.1*id_ref_norm, 2) and tracking_error_iq <= np.power(0.1*iq_ref_norm,2):
+        # if tracking_error_id <= np.power(0.15*id_ref_norm, 2) and tracking_error_iq <= np.power(0.15*iq_ref_norm,2):
+        # if tracking_error_id <= np.power(0.2 * id_ref_norm, 2) and tracking_error_iq <= np.power(0.2 * iq_ref_norm, 2):
+            additional_reward = 1
+        # if factor_vdq != 1 or factor_idq != 1:
+        #     out_of_bounds_penalty = -100
+        # reward = -((tracking_error_id + tracking_error_iq) + 0.1*(delta_vd + delta_vq)) + additional_reward + out_of_bounds_penalty
+        # reward = -((tracking_error_id + tracking_error_iq) + 0.1 * (delta_vd + delta_vq))
+        reward = -((np.power(tracking_error_id,1/4) + np.power(tracking_error_iq,1/4)) +
+                    0.1*(np.power(delta_vd,1/4) + np.power(delta_vq,1/4)))
+
+        # Update states
+        self.id = id_next
+        self.iq = iq_next
+        self.prev_vd = action_vdq[0]
+        self.prev_vq = action_vdq[1]
+
+        return obs, reward, terminated, False, {}
+
+    def reset(self, *, seed = None, options = None):
+        super().reset(seed=seed)
+
+        low, high = 0.9 * np.array([-1, 1])
+        # Initialization
+        # [we]
+        we_norm = np.round(self.np_random.uniform(low=0, high=high), 5)
+        # Define denormalized speed value
+        we = we_norm * self.we_nom
+        # we_norm = 0.1
+        # [id,iq]
+        id_norm = np.round(self.np_random.uniform(low=low, high=high),5)
+        iq_lim  = np.sqrt(np.power(high,2)  - np.power(id_norm,2))
+        iq_norm = np.round(self.np_random.uniform(low=-iq_lim, high=iq_lim),5)
+        # [id_ref, iq_ref]
+        id_ref_norm = np.round(self.np_random.uniform(low=low, high=high), 5)
+        iq_ref_lim = np.sqrt(np.power(high,2)  - np.power(id_ref_norm, 2))
+        iq_ref_norm = np.round(self.np_random.uniform(low=-iq_ref_lim, high=iq_ref_lim), 5)
+
+        ## Testing points
+        # we = 909.89321869 # [rad/s]
+        # we_norm = 909.89321869/self.we_nom
+        # id_norm = 0.1
+        # iq_norm = -0.6
+        # id_ref_norm = -0.6
+        # iq_ref_norm = 0.33
+
+        # dq-frame continuous state-space
+        # dx/dt = a*x + b*u
+        # [dId/dt] = [-R/Ld      we*Lq/Ld][Id]  +  [1/Ld      0 ][Vd] + [      0      ]
+        # [dIq/dt]   [-we*Ld/Lq     -R/Lq][Iq]     [ 0      1/Lq][Vq]   [-we*lambda_PM]
+        a = np.array([[-self.r / self.ld,           we * self.lq / self.ld],
+                      [-we * self.ld / self.lq,     -self.r / self.lq]])
+        b = np.array([[1 / self.ld, 0],
+                      [0, 1 / self.lq]])
+        w = np.array([[0], [-we * self.lambda_PM]])
+        c = np.eye(2)
+        d = np.zeros((2,2))
+
+        bw = np.hstack((b, w))
+        dw = np.hstack((d, np.zeros((2,1))))
+        (ad, bdw, _, _, _) = signal.cont2discrete((a, bw, c, dw), self.dt, method='zoh')
+
+        # s_(t+1) = ad * s(t) + bd * a(t) + w
+        # where ad and bd are 2x2 matrices, s(t) the state [Id, Iq], and a(t) the actions [Vd, Vq].
+        # s(t) = dq currents
+        # a(t) = dq voltages
+        # w = disturbance due to flux-linkage from permanent magnets
+        self.ad = ad
+        self.bd = bdw[:,:b.shape[1]]
+        self.wd = bdw[:,b.shape[1]:].squeeze()
+
+        # Steady-state analysis
+        # self.ss_analysis_c(a, b, w.squeeze(), plot_current=True)        # Continuous
+        # self.ss_analysis_d(ad, self.bd, self.wd, plot_current=True)     # Discrete
+
+        # Store idq, and idq_ref
+        self.id     = self.i_max * id_norm
+        self.iq     = self.i_max * iq_norm
+        self.id_ref = self.i_max * id_ref_norm
+        self.iq_ref = self.i_max * iq_ref_norm
+        self.we     = self.we_nom * we_norm
+
+        # Additional steps to store previous actions
+        n = 2
+        self.prev_vd = 0
+        self.prev_vq = 0
+        for _ in range(n):
+            obs, _, _, _, _ = self.step(action=self.action_space.sample())
+        return obs, {}
+
+    def ss_analysis_c(self,a, b, w=None, plot_current=False):
+        # dx/dt = a*x + b*u + w
+        # Steady-state
+        if w is not None:
+            # 0 = a * x_ss + b * u_ss + w
+            # x_ss = - a^-1 * (b * u_ss + w)
+            x_ss = lambda vdq: -np.linalg.inv(a) @ (b @ vdq + np.kron(np.ones((vdq.shape[1], 1)), w).T) if vdq.shape == (
+            2, 1000) else -np.linalg.inv(a) @ (b @ vdq + w)
+
+            x_ss1 = x_ss(np.array([0, self.vdq_max]))
+            x_ss2 = x_ss(np.array([self.vdq_max, 0]))
+            x_ss3 = x_ss(np.array([0, -self.vdq_max]))
+            x_ss4 = x_ss(np.array([-self.vdq_max, 0]))
+            x_ss5 = x_ss(np.array([self.vdq_max / np.sqrt(2), self.vdq_max / np.sqrt(2)]))
+            x_ss6 = x_ss(np.array([self.vdq_max / np.sqrt(2), -self.vdq_max / np.sqrt(2)]))
+            x_ss7 = x_ss(np.array([-self.vdq_max / np.sqrt(2), self.vdq_max / np.sqrt(2)]))
+            x_ss8 = x_ss(np.array([-self.vdq_max / np.sqrt(2), -self.vdq_max / np.sqrt(2)]))
+
+            # 0 = a * x_ss + b * u_ss + w
+            # u_ss = - b^-1 * (a * x_ss + w)
+            u_ss = lambda idq: -np.linalg.inv(b) @ (a @ idq + w)
+
+            u_ss1 = u_ss([0, self.i_max])
+            u_ss2 = u_ss([self.i_max, 0])
+            u_ss3 = u_ss([0, -self.i_max])
+            u_ss4 = u_ss([-self.i_max, 0])
+            u_ss5 = u_ss([self.i_max / np.sqrt(2), self.i_max / np.sqrt(2)])
+            u_ss6 = u_ss([self.i_max / np.sqrt(2), -self.i_max / np.sqrt(2)])
+            u_ss7 = u_ss([-self.i_max / np.sqrt(2), self.i_max / np.sqrt(2)])
+            u_ss8 = u_ss([-self.i_max / np.sqrt(2), -self.i_max / np.sqrt(2)])
+
+            if plot_current:
+                v_d = np.linspace(-1, 1, 1000)
+                v_q = np.sqrt(1 - np.power(v_d, 2))
+                vdq = self.vdq_max * np.array([v_d, v_q])
+                x_ss_data_pos = x_ss(vdq)
+                vdq = self.vdq_max * np.array([v_d, -v_q])
+                x_ss_data_neg = x_ss(vdq)
+                id = np.concatenate((x_ss_data_pos[0], x_ss_data_neg[0]), 0)
+                iq = np.concatenate((x_ss_data_pos[1], x_ss_data_neg[1]), 0)
+                plt.plot(id, iq, label="Current by voltage limitation")
+                id = np.linspace(-1, 1, 1000)
+                iq = np.sqrt(1 - np.power(id, 2))
+                id_circle = self.i_max * np.concatenate((id, id), 0)
+                iq_circle = self.i_max * np.concatenate((iq, -iq), 0)
+                plt.plot(id_circle, iq_circle, label="Maximum current circle")
+                plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.05),
+                           fancybox=True, shadow=True, ncol=2)
+                plt.title("Continuous state-space model")
+                plt.show()
+
+    def ss_analysis_d(self, ad, bd, wd=None, plot_current=False):
+        # x_k+1 = ad * x_k + bd * u_k + wd
+        # Steady-state
+        if wd is not None:
+            # x_ss = ad * x_ss + bd * u_ss + wd
+            # x_ss = (I - ad)^-1 * (bd * u_ss + wd)
+            x_ss = lambda vdq: -np.linalg.inv(np.eye(2) - ad) @ (
+                        bd @ vdq + np.kron(np.ones((vdq.shape[1], 1)), wd).T) if vdq.shape == (
+                2, 1000) else -np.linalg.inv(ad) @ (bd @ vdq + wd)
+
+            x_ss1 = x_ss(np.array([0, self.vdq_max]))
+            x_ss2 = x_ss(np.array([self.vdq_max, 0]))
+            x_ss3 = x_ss(np.array([0, -self.vdq_max]))
+            x_ss4 = x_ss(np.array([-self.vdq_max, 0]))
+            x_ss5 = x_ss(np.array([self.vdq_max / np.sqrt(2), self.vdq_max / np.sqrt(2)]))
+            x_ss6 = x_ss(np.array([self.vdq_max / np.sqrt(2), -self.vdq_max / np.sqrt(2)]))
+            x_ss7 = x_ss(np.array([-self.vdq_max / np.sqrt(2), self.vdq_max / np.sqrt(2)]))
+            x_ss8 = x_ss(np.array([-self.vdq_max / np.sqrt(2), -self.vdq_max / np.sqrt(2)]))
+
+            # x_ss = ad * x_ss + bd * u_ss + wd
+            # u_ss = bd^-1 * ((I - ad) * x_ss - wd)
+            u_ss = lambda idq: -np.linalg.inv(bd) @ ((np.eye(2) - ad) @ idq - wd)
+
+            u_ss1 = u_ss([0, self.i_max])
+            u_ss2 = u_ss([self.i_max, 0])
+            u_ss3 = u_ss([0, -self.i_max])
+            u_ss4 = u_ss([-self.i_max, 0])
+            u_ss5 = u_ss([self.i_max / np.sqrt(2), self.i_max / np.sqrt(2)])
+            u_ss6 = u_ss([self.i_max / np.sqrt(2), -self.i_max / np.sqrt(2)])
+            u_ss7 = u_ss([-self.i_max / np.sqrt(2), self.i_max / np.sqrt(2)])
+            u_ss8 = u_ss([-self.i_max / np.sqrt(2), -self.i_max / np.sqrt(2)])
+
+            if plot_current:
+                v_d = np.linspace(-1, 1, 1000)
+                v_q = np.sqrt(1 - np.power(v_d, 2))
+                vdq = self.vdq_max * np.array([v_d, v_q])
+                x_ss_data_pos = x_ss(vdq)
+                vdq = self.vdq_max * np.array([v_d, -v_q])
+                x_ss_data_neg = x_ss(vdq)
+                id = np.concatenate((x_ss_data_pos[0], x_ss_data_neg[0]), 0)
+                iq = np.concatenate((x_ss_data_pos[1], x_ss_data_neg[1]), 0)
+                plt.plot(id, iq, label="Current by voltage limitation")
+                id = np.linspace(-1, 1, 1000)
+                iq = np.sqrt(1 - np.power(id, 2))
+                id_circle = self.i_max * np.concatenate((id, id), 0)
+                iq_circle = self.i_max * np.concatenate((iq, -iq), 0)
+                plt.plot(id_circle, iq_circle, label="Maximum current circle")
+                plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.05),
+                           fancybox=True, shadow=True, ncol=2)
+                plt.title("Discrete state-space model")
+                plt.show()
 if __name__ == "__main__":
     # Environment
     sys_params_dict = {"dt": 1 / 10e3,  # Sampling time [s]
