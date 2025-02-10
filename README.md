@@ -21,7 +21,7 @@ python train_siso.py
 How to train an RL agent considering a multiple input multiple output system (two inputs and two outputs for this example)..
 
 ```bash
-python train_mimo_var_speed.py
+python rl_state_space_control.py
 ```
 
 
