@@ -12,16 +12,16 @@ pip install -r requirements.txt
 
 ## Run
 
-How to train an RL agent considering a single input single output system.
+How to train an RL agent considering a single-phase resistive inductive load, three-phase resistive inductive load, or a permanent magnet synchronous machine:
 
 ```bash
-python train_siso.py
+python rl_state_space_control.py --env_name X --reward_function Y --train
 ```
 
-How to train an RL agent considering a multiple input multiple output system (two inputs and two outputs for this example)..
+To test the resulting network:
 
 ```bash
-python rl_state_space_control.py
+python rl_state_space_control.py --env_name X --reward_function Y --test
 ```
 
-
+where *X* is the environment name {*LoadRL*, *Load3RL*, *PMSM*}, and Y is the reward function type {*absolute*, *quadratic*, *quadratic_2*, *square_root*, *square_root_2*, *quartic_root*, *quartic_root_2*}
