@@ -139,7 +139,7 @@ if test:
         state_list  = [obs[0][0:2] if env_name == "LoadRL" else obs[0][0:4]]
 
         # plt.figure(episode, figsize=(30, 5))
-        plt.figure(episode, figsize=(10, 6))
+        # plt.figure(episode, figsize=(10, 6))
         done = False
         while not done:
             action, _states = model.predict(obs)

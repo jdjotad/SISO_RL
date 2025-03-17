@@ -5,10 +5,12 @@ declare -a reward_functions=(	"absolute"
 				"square_root_2"
 				"quartic_root"
 				"quartic_root_2")
+declare environments=(	"LoadRL" "Load3RL" "PMSM")
 source ~/.venv/RL/bin/activate
 for reward_function in "${reward_functions[@]}"
 do
-    python rl_state_space_control.py --env_name LoadRL --reward_function $reward_function --test
-    python rl_state_space_control.py --env_name Load3RL --reward_function $reward_function --test
-    python rl_state_space_control.py --env_name PMSM --reward_function $reward_function --test
+	for environment in "${environments[@]}"
+	do
+		python rl_state_space_control.py --env_name $environment --reward_function $reward_function --test
+	done
 done

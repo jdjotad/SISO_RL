@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+
 ## ------------ Clarke Park Tranformation ------------ ##
 class ClarkePark:
     def __init__(self):
@@ -102,7 +103,7 @@ class SSAnalysis:
                 plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.05),
                            fancybox=True, shadow=True, ncol=2)
                 plt.title("Continuous state-space model")
-                plt.show()
+                # plt.show()
         else:
             # dx/dt = a*x + b*u
             # Steady-state
@@ -150,7 +151,7 @@ class SSAnalysis:
                 plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.05),
                            fancybox=True, shadow=True, ncol=2)
                 plt.title("Continuous state-space model")
-                plt.show()
+                # plt.show()
 
     def discrete(self, ad, bd, wd=None, plot_current=False):
         if wd is not None:
@@ -202,7 +203,7 @@ class SSAnalysis:
                 plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.05),
                            fancybox=True, shadow=True, ncol=2)
                 plt.title("Discrete state-space model")
-                plt.show()
+                # plt.show()
         else:
             # x_k+1 = ad * x_k + bd * u_k
             # Steady-state
@@ -250,17 +251,21 @@ class SSAnalysis:
                 plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.05),
                            fancybox=True, shadow=True, ncol=2)
                 plt.title("Discrete state-space model")
-                plt.show()
+                # plt.show()
 
 class PlotTest():
     def __init__(self):
         return
 
     def plot_single_phase(self, idx, observations, actions, reward, env_name, reward_type):
-        plt.clf()
+        # plt.clf()
+        plt.close()
         plt.suptitle(f"Reward: {reward_type}\n")
         # Plot State
+        fig = plt.gcf()
         ax = plt.subplot(131)
+        fig.set_figheight(6)
+        fig.set_figwidth(10)
         ax.set_title("State vs step")
         ax.plot(observations, label=['I', 'Iref'])
         box = ax.get_position()
@@ -290,11 +295,15 @@ class PlotTest():
 
 
     def plot_three_phase(self, idx, observations, actions, reward, env_name, reward_type, speed=None):
-        plt.clf()
+        # plt.clf()
+        plt.close()
         if speed is not None:
             plt.suptitle(f"Reward: {reward_type}\nSpeed = {speed} [rad/s]")
         # Plot State
+        fig = plt.gcf()
         ax = plt.subplot(131)
+        fig.set_figheight(6)
+        fig.set_figwidth(10)
         ax.set_title("State vs step")
         ax.plot(observations, label=['Id', 'Iq', 'Idref', 'Iqref'])
         box = ax.get_position()

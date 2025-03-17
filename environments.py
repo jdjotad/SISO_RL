@@ -94,23 +94,23 @@ class EnvLoadRL(gym.Env):
         prev_v_norm = self.prev_v / self.vdq_max
 
         # Observation: [current, reference, prev_v]
-        obs = np.array([i_next_norm, i_ref_norm, i_ref_norm], dtype=np.float32)
+        obs = np.array([i_next_norm, i_ref_norm, prev_v_norm], dtype=np.float32)
 
         terminated = False
 
         # Reward function
         i_norm = self.i / self.i_max
-        e_i = np.power(i_norm - i_ref_norm, 2)
-        delta_v = np.power(action_clip - prev_v_norm, 2)
+        e_i = np.abs(i_norm - i_ref_norm)
+        delta_v = np.abs(action_clip - prev_v_norm)
 
-        if self.reward_function == "quadratic":
+        if self.reward_function == "absolute":
             reward = -(e_i + 0.1 * delta_v)
-        elif self.reward_function == "absolute":
-            reward = -(np.power(e_i, 1/2) + 0.1 * np.power(delta_v, 1/2))
+        elif self.reward_function == "quadratic":
+            reward = -(np.power(e_i, 2) + 0.1 * np.power(delta_v, 2))
         elif self.reward_function == "square_root":
-            reward = -(np.power(e_i, 1/4) + 0.1 * np.power(delta_v, 1/4))
+            reward = -(np.power(e_i, 1/2) + 0.1 * np.power(delta_v, 1/2))
         elif self.reward_function == "quartic_root":
-            reward = -(np.power(e_i, 1/8) + 0.1 * np.power(delta_v, 1/8))
+            reward = -(np.power(e_i, 1/4) + 0.1 * np.power(delta_v, 1/4))
         else:
             raise NotImplementedError
 
@@ -209,7 +209,7 @@ class EnvLoad3RL(gym.Env):
         action_vdq = self.vdq_max * action  # Denormalize action
 
         # Calculate if that the module of Vdq is bigger than 1
-        norm_vdq = np.sqrt(np.power(action_vdq[0], 2) + np.power(action_vdq[0], 2))
+        norm_vdq = np.sqrt(np.power(action_vdq[0], 2) + np.power(action_vdq[1], 2))
         # factor_vdq = self.vdq_max / norm_vdq
         # factor_vdq = factor_vdq if factor_vdq < 1 else 1
         factor_vdq = 1
@@ -233,7 +233,7 @@ class EnvLoad3RL(gym.Env):
         iq_ref_norm  = self.iq_ref / self.i_max
         we_norm      = self.we / self.we_nom
         prev_vd_norm = self.prev_vd / self.vdq_max
-        prev_vq_norm = self.prev_vd / self.vdq_max
+        prev_vq_norm = self.prev_vq / self.vdq_max
         # Observation: [id, iq, id_ref, iq_ref, we, prev_vd, prev_vq]
         obs = np.array([id_next_norm, iq_next_norm,  id_ref_norm, iq_ref_norm, we_norm, prev_vd_norm, prev_vq_norm], dtype=np.float32)
 
@@ -407,7 +407,7 @@ class EnvPMSM(gym.Env):
         action_vdq = self.vdq_max * action  # Denormalize action
 
         # Calculate if that the module of Vdq is bigger than 1
-        norm_vdq = np.sqrt(np.power(action_vdq[0], 2) + np.power(action_vdq[0], 2))
+        norm_vdq = np.sqrt(np.power(action_vdq[0], 2) + np.power(action_vdq[1], 2))
         # factor_vdq = self.vdq_max / norm_vdq
         # factor_vdq = factor_vdq if factor_vdq < 1 else 1
         factor_vdq = 1
@@ -431,7 +431,7 @@ class EnvPMSM(gym.Env):
         iq_ref_norm  = self.iq_ref / self.i_max
         we_norm      = self.we / self.we_nom
         prev_vd_norm = self.prev_vd / self.vdq_max
-        prev_vq_norm = self.prev_vd / self.vdq_max
+        prev_vq_norm = self.prev_vq / self.vdq_max
         # Observation: [id, iq, id_ref, iq_ref, we, prev_vd, prev_vq]
         obs = np.array([id_next_norm, iq_next_norm,  id_ref_norm, iq_ref_norm, we_norm, prev_vd_norm, prev_vq_norm], dtype=np.float32)
 
@@ -554,6 +554,9 @@ if __name__ == "__main__":
     # Maximum current [A]
     sys_params_dict["i_max"] = idq_max_norm(sys_params_dict["vdc"] / 2, sys_params_dict["we_nom"],
                                             sys_params_dict["r"], sys_params_dict["l"])
+    # Reward function
+    sys_params_dict["reward"] = "quadratic"
+    # Initialize and test environment
     env_test = EnvLoad3RL(sys_params=sys_params_dict)
     obs_test, _ = env_test.reset()
     env_test.step(action=env_test.action_space.sample())
