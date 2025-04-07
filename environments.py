@@ -479,7 +479,7 @@ class EnvPMSM(gym.Env):
 
         # Initialization speed
         # [we]
-        we_norm = np.round(self.np_random.uniform(low=0, high=high), 5) 
+        we_norm = np.round(self.np_random.uniform(low=0, high=high)) 
 
         # Overwrite predefined speed from options
         if options:
@@ -527,13 +527,13 @@ class EnvPMSM(gym.Env):
 
         # Initialization currents
         # [id,iq]
-        id_norm = np.round(self.np_random.uniform(low=low, high=high),5)
+        id_norm = np.round(self.np_random.uniform(low=low, high=high))
         iq_lim  = np.sqrt(np.power(high,2)  - np.power(id_norm,2))
-        iq_norm = np.round(self.np_random.uniform(low=-iq_lim, high=iq_lim),5)
+        iq_norm = np.round(self.np_random.uniform(low=-iq_lim, high=iq_lim))
         # [id_ref, iq_ref]
-        id_ref_norm = np.round(self.np_random.uniform(low=low, high=high), 5)
+        id_ref_norm = np.round(self.np_random.uniform(low=low, high=high))
         iq_ref_lim = np.sqrt(np.power(high,2)  - np.power(id_ref_norm, 2))
-        iq_ref_norm = np.round(self.np_random.uniform(low=-iq_ref_lim, high=iq_ref_lim), 5)
+        iq_ref_norm = np.round(self.np_random.uniform(low=-iq_ref_lim, high=iq_ref_lim))
 
         # Overwrite predefined current values from options
         if options:
@@ -722,7 +722,7 @@ class EnvPMSMDataBased(gym.Env):
 
         # Initialization speed
         # [we]
-        we_norm = np.round(self.np_random.uniform(low=0, high=high), 5) 
+        we_norm = np.round(self.np_random.uniform(low=0, high=high)) 
 
         # Overwrite predefined speed from options
         if options:
@@ -737,13 +737,13 @@ class EnvPMSMDataBased(gym.Env):
 
         # Initialization currents
         # [id,iq]
-        id_norm = np.round(self.np_random.uniform(low=low, high=high),5)
+        id_norm = np.round(self.np_random.uniform(low=low, high=high))
         iq_lim  = np.sqrt(np.power(high,2)  - np.power(id_norm,2))
-        iq_norm = np.round(self.np_random.uniform(low=-iq_lim, high=iq_lim),5)
+        iq_norm = np.round(self.np_random.uniform(low=-iq_lim, high=iq_lim))
         # [id_ref, iq_ref]
-        id_ref_norm = np.round(self.np_random.uniform(low=low, high=high), 5)
+        id_ref_norm = np.round(self.np_random.uniform(low=low, high=high))
         iq_ref_lim = np.sqrt(np.power(high,2)  - np.power(id_ref_norm, 2))
-        iq_ref_norm = np.round(self.np_random.uniform(low=-iq_ref_lim, high=iq_ref_lim), 5)
+        iq_ref_norm = np.round(self.np_random.uniform(low=-iq_ref_lim, high=iq_ref_lim))
 
         # Overwrite predefined current values from options
         if options:
