@@ -125,14 +125,14 @@ environments = {"LoadRL": {"env": EnvLoadRL,
                 "PMSM": {"env": EnvPMSM,
                     "name": f"PMSM / Delta Vdq penalty / Reward {reward_function}",
                     "max_episode_steps": 200,
-                    "max_episodes": 10_000,
+                    "max_episodes": 3_000, # 10_000
                     "reward": reward_function,
                     "model_name": f"ddpg_EnvPMSM_{reward_function}"
                     },
                 "PMSMDataBased": {"env": EnvPMSMDataBased,
                     "name": f"PMSM data based / Delta Vdq penalty / Reward {reward_function}",
                     "max_episode_steps": 200,
-                    "max_episodes": 2_000, # 10_000 
+                    "max_episodes": 3_000, # 10_000 
                     "reward": reward_function,
                     "model_name": f"ddpg_EnvPMSMDataBased_{reward_function}"
                     },
