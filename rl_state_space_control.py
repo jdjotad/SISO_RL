@@ -307,8 +307,8 @@ if test_2:
     current_steps = 2
 
     speed_norm_array  = np.linspace(0, 0.9, num = speed_steps)
-    id_norm_array     = np.linspace(-0.9, 0.9, num = current_steps)
-    iq_norm_array     = np.linspace(-0.9, 0.9, num = current_steps)
+    id_norm_array     = np.linspace(-0.8, 0.9, num = current_steps)
+    iq_norm_array     = np.linspace(-0.8, 0.9, num = current_steps)
     
     # Idref test
     id_ref_norm_array = np.linspace(-0.5, 0.5, num = current_steps)
@@ -325,6 +325,10 @@ if test_2:
     for id_idx, current_options["id_ref_norm"] in enumerate(tqdm(id_ref_norm_array, total=len(id_ref_norm_array), desc="Idref", leave=True)):
         error_id_ref = []
         for current_options["id_norm"], current_options["iq_norm"], current_options["iq_ref_norm"], speed_norm in tqdm(inner_loop_combinations, total=len(inner_loop_combinations), desc="Combinations", leave=False):
+                # If the reference point is outside of the circle, pass
+                if ((current_options["id_ref_norm"]^2 + current_options["iq_ref_norm"]^2 >= 1) or 
+                    (current_options["id_norm"]^2     + current_options["iq_norm"]^2     >= 1)    ):
+                    pass
                 options = current_options | {"we_norm": speed_norm} | voltage_options
                 vec_env.set_options(options)
                 obs = vec_env.reset()
@@ -369,6 +373,9 @@ if test_2:
     for iq_idx, current_options["iq_ref_norm"] in enumerate(tqdm(iq_ref_norm_array, total=len(iq_ref_norm_array), desc="Iqref", leave=True)):
         error_iq_ref = []
         for current_options["id_norm"], current_options["iq_norm"], current_options["id_ref_norm"], speed_norm in tqdm(inner_loop_combinations, total=len(inner_loop_combinations), desc="Combinations", leave=False):
+                if ((current_options["id_ref_norm"]^2 + current_options["iq_ref_norm"]^2 >= 1) or 
+                    (current_options["id_norm"]^2     + current_options["iq_norm"]^2     >= 1)    ):
+                    pass
                 options = current_options | {"we_norm": speed_norm} | voltage_options
                 vec_env.set_options(options)
                 obs = vec_env.reset()
