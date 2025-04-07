@@ -1,0 +1,22 @@
+Model: PMSMDataBased - Reward function: square_root - Episodes: 5
+Average settling steps: 3.80 [steps]
+Average settling time: 0.38 [ms]
+Average overshoot id: 3.82 %
+Average overshoot iq: 0.74 %
+Average undershoot id: 0.44 %
+Average undershoot iq: 0.00 %
+Average steady-state error id / reference: 0.15 %
+Average steady-state error iq / reference: 0.43 %
+Average steady-state error id / Imax: 0.00 %
+Average steady-state error iq / Imax: 0.00 %
+Model: PMSMDataBased - Reward function: square_root - Episodes: 5
+Average settling steps: 5.40 [steps]
+Average settling time: 0.54 [ms]
+Average overshoot id: 1.53 %
+Average overshoot iq: 2.97 %
+Average undershoot id: 0.00 %
+Average undershoot iq: 0.00 %
+Average steady-state error id / reference: 0.97 %
+Average steady-state error iq / reference: 1.76 %
+Average steady-state error id / Imax: 0.00 %
+Average steady-state error iq / Imax: 0.00 %

@@ -1,34 +1,52 @@
 import gymnasium as gym
 import numpy as np
-import matplotlib.pyplot as plt
 import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # or any {'0', '1', '2'}
 import sys
+import csv
 
 import wandb
 import argparse
 
 from environments import *
+from utils import Metrics, RewardLoggingCallback
 
 from stable_baselines3 import DDPG
 from stable_baselines3.common.noise import NormalActionNoise, OrnsteinUhlenbeckActionNoise
 
+from tqdm import tqdm
+
+import matplotlib
+import matplotlib.pyplot as plt
+# matplotlib.use('Agg')
+
 # CLI Input
+choices = {"env_name": ['LoadRL', 'Load3RL', 'PMSM', 'PMSMDataBased'],
+           "reward_function": ['absolute', 'quadratic', 'quadratic_2', 'square_root', 'square_root_2',
+                             'quartic_root', 'quartic_root_2'],
+            "error_type": ['absolute', 'relative', 'relative_imax']}
 parser = argparse.ArgumentParser()
 parser.add_argument("--env_name", nargs='?', type=str, default="LoadRL",
-                    choices=['LoadRL', 'Load3RL', 'PMSM'], help='Environment name')
+                    choices=choices["env_name"], help='Environment name')
 parser.add_argument("--reward_function", nargs='?', type=str, default="quadratic",
-                    choices=['absolute', 'quadratic', 'quadratic_2', 'square_root', 'square_root_2',
-                             'quartic_root', 'quartic_root_2'], help='Reward function type')
+                    choices=choices["reward_function"], help='Reward function type')
 parser.add_argument("--job_id", nargs='?', type=str, default="")
 parser.add_argument("--train", action=argparse.BooleanOptionalAction)
-parser.add_argument("--test", action=argparse.BooleanOptionalAction)
+parser.add_argument("--test_1", action=argparse.BooleanOptionalAction)
+parser.add_argument("--test_2", action=argparse.BooleanOptionalAction)
+parser.add_argument("--error_type", nargs='?', type=str, default="absolute",
+                    choices=choices["error_type"], help='Error type for Test 2')
+parser.add_argument("--plot", action=argparse.BooleanOptionalAction)
 
 
 env_name        = parser.parse_args().env_name
 reward_function = parser.parse_args().reward_function
 job_id          = parser.parse_args().job_id
 train           = parser.parse_args().train
-test            = parser.parse_args().test
+test_1          = parser.parse_args().test_1
+test_2          = parser.parse_args().test_2
+error_type      = parser.parse_args().error_type
+plot_figs       = parser.parse_args().plot
 
 # set up matplotlib
 # plt.ion()
@@ -62,30 +80,61 @@ elif env_name == "PMSM":
                        "we_nom": 200*2*np.pi,   # Nominal speed [rad/s]
                        "i_max": 300,            # Maximum current [A]
                        }
+elif env_name == "PMSMDataBased":
+    # Rows = Id / Columns = Iq
+    pmsm_data = scp.io.loadmat("look_up_table_based_pmsm_prius_motor_data.mat", spmatrix=False)
+    ldd = pmsm_data['Lmidd']
+    ldq = pmsm_data['Lmidq']
+    lqq = pmsm_data['Lmiqq']
+    psid = pmsm_data['Psid']
+    psiq = pmsm_data['Psiq']
+    id = pmsm_data['imd'].flatten()
+    iq = pmsm_data['imq'].flatten()
+    sys_params_dict = {"dt": 1 / 10e3,      # Sampling time [s]
+                       "r": 0.015,     # Resistance [Ohm]
+                       "id": id,       # Current vector d-frame [A]
+                       "iq": iq,       # Cirrene vector d-frame [A]
+                       "ldd": ldd,       # Self-inductance matrix d-frame [H]
+                       "ldq": ldq,       # Cross-coupling inductance matrix dq-frame [H]
+                       "lqq": lqq,       # Self-inductance matrix q-frame [H]
+                       "lss": 0.0001,       # Leakage inductance [H]
+                       "psid": psid,       # Flux-linkage matrix d-frame [Wb]
+                       "psiq": psiq,       # Flux-linkage matrix q-frame [Wb]
+                       "vdc": 1200,             # DC bus voltage [V]
+                       "we_nom": 200*2*np.pi,   # Nominal speed [rad/s]
+                       "i_max": 150,            # Maximum current [A]
+                       }
 else:
     raise NotImplementedError
     # sys.exit("Environment name not existant")
 
 environments = {"LoadRL": {"env": EnvLoadRL,
                     "name": f"Single Phase RL system / Delta Vdq penalty / Reward {reward_function}",
-                    "max_episode_steps": 500,
+                    "max_episode_steps": 200,
                     "max_episodes": 200,
                     "reward": reward_function,
                     "model_name": f"ddpg_EnvLoadRL_{reward_function}"
                     },
                 "Load3RL": {"env": EnvLoad3RL,
                     "name": f"Three-phase RL system / Delta Vdq penalty / Reward {reward_function}",
-                    "max_episode_steps": 500,
+                    "max_episode_steps": 200,
                     "max_episodes": 300,
                     "reward": reward_function,
                     "model_name": f"ddpg_EnvLoad3RL_{reward_function}"
                     },
                 "PMSM": {"env": EnvPMSM,
                     "name": f"PMSM / Delta Vdq penalty / Reward {reward_function}",
-                    "max_episode_steps": 500,
-                    "max_episodes": 300,
+                    "max_episode_steps": 200,
+                    "max_episodes": 10_000,
                     "reward": reward_function,
                     "model_name": f"ddpg_EnvPMSM_{reward_function}"
+                    },
+                "PMSMDataBased": {"env": EnvPMSMDataBased,
+                    "name": f"PMSM data based / Delta Vdq penalty / Reward {reward_function}",
+                    "max_episode_steps": 200,
+                    "max_episodes": 2_000, # 10_000 
+                    "reward": reward_function,
+                    "model_name": f"ddpg_EnvPMSMDataBased_{reward_function}"
                     },
                 }
 
@@ -100,6 +149,9 @@ env = gym.wrappers.RecordEpisodeStatistics(env)
 # The noise objects for DDPG
 n_actions = env.action_space.shape[-1]
 action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=0.1 * np.ones(n_actions))
+
+# Function to store the reward in a csv file
+reward_callback = RewardLoggingCallback(csv_file=f"train_{env_name}_{reward_function}.csv")
 
 model = DDPG("MlpPolicy", env=env, action_noise=action_noise, verbose=1, tensorboard_log=f"runs/ddpg")
 vec_env = model.get_env()
@@ -121,17 +173,37 @@ if train:
     print(f"Training: {env_sel['name']}")
     print(f"Model: {env_sel['model_name']}")
 
-    model.learn(total_timesteps=config["total_timesteps"], log_interval=10, progress_bar=True)
+    model.learn(total_timesteps=config["total_timesteps"], log_interval=1, callback=reward_callback) # log_interval=10, progress_bar=True
     model.save(os.path.join('weights/',env_sel["model_name"]))
-if test:
+
+if test_1:
+    metrics = Metrics(dt=sys_params_dict["dt"])
     plot = PlotTest()
 
-    print(f"Testing: {env_sel['name']}")
-    print(f"Model: {env_sel['model_name']}")
-    model = DDPG.load(os.path.join('weights/',env_sel["model_name"]))
+    test_max_episodes = 5   # 300
 
-    test_max_episodes = 10
+    settling_steps_arr = np.zeros(test_max_episodes)
+    settling_time_arr  = np.zeros(test_max_episodes)
+    overshoot_id_arr   = np.zeros(test_max_episodes)
+    overshoot_iq_arr   = np.zeros(test_max_episodes)
+    undershoot_id_arr  = np.zeros(test_max_episodes)
+    undershoot_iq_arr  = np.zeros(test_max_episodes)
+    ss_error_id_arr    = np.zeros(test_max_episodes)
+    ss_error_iq_arr    = np.zeros(test_max_episodes)
+    ss_error_id_arr_imax = np.zeros(test_max_episodes)
+    ss_error_iq_arr_imax = np.zeros(test_max_episodes)
+
+    # Test a single reward_function
+    print(f"Test 1 in environment: {env_sel['name']}")
+    print(f"Model: {env_sel['model_name']}")
+
+    model = DDPG.load(os.path.join('weights/',env_sel["model_name"]), print_system_info=False)
+
+    high_error_episodes = []
     for episode in range(test_max_episodes):
+        vec_env.seed(seed=episode)
+        vec_env.set_options({"id_norm": 0/sys_params_dict["i_max"], 
+                             "iq_norm": 30/sys_params_dict["i_max"]})
         obs = vec_env.reset()
 
         action_list = []
@@ -147,9 +219,209 @@ if test:
                 action_list.append(action[0])
                 state_list.append(obs[0][0:2] if env_name == "LoadRL" else obs[0][0:4]) # Don't save prev_V
                 reward_list.append(rewards[0])
-        if env_name == "LoadRL":
-            plot.plot_single_phase(episode, state_list, action_list, reward_list,
-                                  env_sel['model_name'], env_sel['reward'])
-        else:
-            plot.plot_three_phase(episode, state_list, action_list, reward_list,
-                                  env_sel['model_name'], env_sel['reward'], sys_params_dict['we_nom'] * obs[0][4])
+
+        # Transform lists to numpy arrays
+        action_list = np.array(action_list)
+        state_list  = np.array(state_list)
+        reward_list = np.array(reward_list)
+
+        # Save metrics
+        id_data = state_list[:,0]
+        iq_data = state_list[:,1]
+        id_ref  = state_list[0,2]
+        iq_ref  = state_list[0,3]
+        settling_steps_id, ss_val_id = metrics.settling_time(id_data)
+        settling_steps_iq, ss_val_iq = metrics.settling_time(iq_data)
+        settling_steps_arr[episode] = np.max([settling_steps_id, settling_steps_iq])
+        settling_time_arr[episode]  = sys_params_dict["dt"]*settling_steps_arr[episode]
+        overshoot_id_arr[episode]   = metrics.overshoot(id_data, ss_val_id)
+        overshoot_iq_arr[episode]   = metrics.overshoot(iq_data, ss_val_iq)
+        undershoot_id_arr[episode]  = metrics.undershoot(id_data, ss_val_id)
+        undershoot_iq_arr[episode]  = metrics.undershoot(iq_data, ss_val_iq)
+        error_id = metrics.error(id_ref, ss_val_id)
+        error_iq = metrics.error(id_ref, ss_val_id)
+        ss_error_id_arr[episode]    = error_id / np.abs(id_ref)
+        ss_error_iq_arr[episode]    = error_iq / np.abs(iq_ref)
+        ss_error_id_arr_imax[episode] = error_id / sys_params_dict["i_max"]
+        ss_error_iq_arr_imax[episode] = error_iq / sys_params_dict["i_max"]
+
+        if ss_error_id_arr[episode] > 0.1 or ss_error_iq_arr[episode] > 0.1:
+            high_error_episodes.append(f"Error in episode {episode}: Id = {100*ss_error_id_arr[episode]:.2f} % / Iq = {100*ss_error_iq_arr[episode]:.2f} %")
+        # print(f"Overshoot id in episode {episode}: {100*overshoot_id_arr[episode]:.2f} %")
+        # print(f"Overshoot iq in episode {episode}: {100*overshoot_iq_arr[episode]:.2f} %")
+        # print(f"Undershoot id in episode {episode}: {100*undershoot_id_arr[episode]:.2f} %")
+        # print(f"Undershoot iq in episode {episode}: {100*undershoot_iq_arr[episode]:.2f} %")
+        # print(f"Settling time in episode {episode:d}: {settling_steps_arr[episode]:.0f} [steps] * {1e3*sys_params_dict["dt"]:.2f} [ms/step] = " +
+        #       f"{1e3*settling_time_arr[episode]:.2f} [ms]")
+
+        # Plot and save figures
+        if plot_figs:
+            if env_name == "LoadRL":
+                plot.plot_single_phase(episode, state_list, action_list, reward_list,
+                                    env_name, env_sel['model_name'], env_sel['reward'])
+            else:
+                plot.plot_three_phase(episode, state_list, action_list, reward_list,
+                                    env_name, env_sel['model_name'], env_sel['reward'], sys_params_dict['we_nom'] * obs[0][4])
+    
+    # Average metrics
+    with open(f"{env_name}_metrics.txt", 'a') as f:
+        print(f"Model: {env_name} - Reward function: {reward_function} - Episodes: {test_max_episodes}", file=f)
+        print(f"Average settling steps: {np.mean(settling_steps_arr):.2f} [steps]", file=f)
+        print(f"Average settling time: {1e3*np.mean(settling_time_arr):.2f} [ms]", file=f)
+        print(f"Average overshoot id: {100*np.mean(overshoot_id_arr):.2f} %", file=f)
+        print(f"Average overshoot iq: {100*np.mean(overshoot_iq_arr):.2f} %", file=f)
+        print(f"Average undershoot id: {100*np.mean(undershoot_id_arr):.2f} %", file=f)
+        print(f"Average undershoot iq: {100*np.mean(undershoot_iq_arr):.2f} %", file=f)
+        print(f"Average steady-state error id / reference: {100*np.mean(ss_error_id_arr):.2f} %", file=f)
+        print(f"Average steady-state error iq / reference: {100*np.mean(ss_error_iq_arr):.2f} %", file=f)
+        print(f"Average steady-state error id / Imax: {100*np.mean(ss_error_id_arr_imax):.2f} %", file=f)
+        print(f"Average steady-state error iq / Imax: {100*np.mean(ss_error_iq_arr_imax):.2f} %", file=f)
+        [print(high_error_episode, file=f) for high_error_episode in high_error_episodes]
+
+if test_2:
+    # Wandb
+    run = wandb.init(
+        project="sb3",
+        name=f"Test 2: {env_name} {reward_function} / {job_id}",
+        save_code=True,  # optional
+    )
+
+    # Test a single reward_function
+    print(f"Test 2 in environment: {env_sel['name']}")
+    print(f"Model: {env_sel['model_name']}")
+
+    model = DDPG.load(os.path.join('weights/',env_sel["model_name"]), print_system_info=False)
+
+    current_options = { "id_norm": 0, 
+                        "iq_norm": 0,
+                        "id_ref_norm": 0,
+                        "iq_ref_norm": 0}
+    voltage_options = {"prev_vd_norm": 0, 
+                       "prev_vq_norm": 0}
+
+    seed = 0
+    vec_env.seed(seed=seed)
+
+    sim_steps = 100
+    speed_steps = 2
+    current_steps = 2
+
+    speed_norm_array  = np.linspace(0, 0.9, num = speed_steps)
+    id_norm_array     = np.linspace(-0.9, 0.9, num = current_steps)
+    iq_norm_array     = np.linspace(-0.9, 0.9, num = current_steps)
+    
+    # Idref test
+    id_ref_norm_array = np.linspace(-0.5, 0.5, num = current_steps)
+    iq_ref_norm_array = np.linspace(-0.9, 0.9, num = current_steps)
+
+    inner_loop_combinations = [(id, iq_ref, iq_ref, speed)  for id in id_norm_array 
+                                                        for iq_ref in iq_ref_norm_array
+                                                        for speed  in speed_norm_array]
+    # inner_loop_combinations = [(id, iq_ref, iq_ref, speed)  for id in id_norm_array 
+    #                                                     for iq     in iq_norm_array
+    #                                                     for iq_ref in iq_ref_norm_array
+    #                                                     for speed  in speed_norm_array]
+    error_data_id_ref = np.zeros((current_steps, len(inner_loop_combinations)))
+    for id_idx, current_options["id_ref_norm"] in enumerate(tqdm(id_ref_norm_array, total=len(id_ref_norm_array), desc="Idref", leave=True)):
+        error_id_ref = []
+        for current_options["id_norm"], current_options["iq_norm"], current_options["iq_ref_norm"], speed_norm in tqdm(inner_loop_combinations, total=len(inner_loop_combinations), desc="Combinations", leave=False):
+                options = current_options | {"we_norm": speed_norm} | voltage_options
+                vec_env.set_options(options)
+                obs = vec_env.reset()
+
+                id = []
+                done = False
+                for i in np.arange(sim_steps):
+                    action, _states = model.predict(obs)
+                    obs, rewards, done, info = vec_env.step(action)
+
+                    id.append(obs.flatten()[0])
+
+                id_ss, id_ref = (np.mean(id[-10:]), obs.flatten()[2])
+                # error_id_ref.append((id_ref - id_ss) / id_ref)
+                error_id_ref.append(id_ref - id_ss)
+                if np.abs(error_id_ref[-1]) >= 0.1:
+                    print(f"Id0: {current_options['id_norm']} / " +
+                          f"Iq0: {current_options['iq_norm']} / " +
+                          f"Idref: {current_options['id_ref_norm']} / " +
+                          f"Iqref: {current_options['iq_ref_norm']} / " +
+                          f"we: {speed_norm} / " +
+                          f"error: {error_id_ref[-1]}")
+
+            
+        error_data_id_ref[id_idx] = error_id_ref
+    
+    # Save values
+    with open(f'test_{env_name}_{reward_function}_Id_data.csv', 'w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow([f"Id_ref = {idref}" for idref in id_ref_norm_array])
+        writer.writerows(error_data_id_ref.transpose())
+
+     # Iqref test
+    id_ref_norm_array = np.linspace(-0.9, 0.9, num = current_steps)
+    iq_ref_norm_array = np.linspace(-0.5, 0.5, num = current_steps)
+
+
+    inner_loop_combinations = [(idref, iq, idref, speed)  for idref in id_ref_norm_array 
+                                                          for iq    in iq_norm_array
+                                                          for speed  in speed_norm_array]
+    error_data_iq_ref = np.zeros((current_steps, len(inner_loop_combinations)))
+    for iq_idx, current_options["iq_ref_norm"] in enumerate(tqdm(iq_ref_norm_array, total=len(iq_ref_norm_array), desc="Iqref", leave=True)):
+        error_iq_ref = []
+        for current_options["id_norm"], current_options["iq_norm"], current_options["id_ref_norm"], speed_norm in tqdm(inner_loop_combinations, total=len(inner_loop_combinations), desc="Combinations", leave=False):
+                options = current_options | {"we_norm": speed_norm} | voltage_options
+                vec_env.set_options(options)
+                obs = vec_env.reset()
+
+                iq = []
+                done = False
+                for i in np.arange(sim_steps):
+                    action, _states = model.predict(obs)
+                    obs, rewards, done, info = vec_env.step(action)
+
+                    iq.append(obs.flatten()[1])
+
+                iq_ss, iq_ref = (np.mean(iq[-10:]), obs.flatten()[3])
+                # error_iq_ref.append((iq_ref - iq_ss) / iq_ref)
+                error_iq_ref.append(iq_ref - iq_ss)
+
+                if np.abs(error_iq_ref[-1]) >= 0.1:
+                    print(f"Id0: {current_options['id_norm']} / " +
+                          f"Iq0: {current_options['iq_norm']} / " +
+                          f"Idref: {current_options['id_ref_norm']} / " +
+                          f"Iqref: {current_options['iq_ref_norm']} / " +
+                          f"we: {speed_norm} / " +
+                          f"error: {error_iq_ref[-1]}")
+                    
+            
+        error_data_iq_ref[iq_idx] = error_iq_ref
+    
+    # Save values
+    with open(f'test_{env_name}_{reward_function}_Iq_data.csv', 'w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow([f"Iq_ref = {iqref}" for iqref in iq_ref_norm_array])
+        writer.writerows(error_data_iq_ref.transpose())
+
+
+    if plot_figs:
+        plot = PlotTest()
+
+        mean = np.mean(error_data_id_ref, axis=1)
+        median = np.median(error_data_id_ref, axis=1)
+        std = np.std(error_data_id_ref, axis=1)
+        min = np.min(error_data_id_ref, axis=1)
+        max = np.max(error_data_id_ref, axis=1)
+        first_quartile = np.percentile(error_data_id_ref, 25, axis=1)
+        third_quartile = np.percentile(error_data_id_ref, 75, axis=1)
+
+        # labels = [f"[{id_ref_norm_array[idx]:.2f}, {id_ref_norm_array[idx + 1]:.2f}[" for idx in np.arange(len(id_ref_norm_array[:-1]))]
+        labels = [f"{sys_params_dict['i_max']*idref:.2f}" for idref in id_ref_norm_array]
+
+        fig, ax = plt.subplots()
+        ax.set_ylabel('Tracking error [%]')
+        ax.set_xlabel('Id_ref [A]')
+        bplot = ax.boxplot(error_data_id_ref.transpose(),
+                        tick_labels=labels,# will be used to label x-ticks
+                        meanline=True,
+                        showmeans=True) 
+        plt.show()
