@@ -1,6 +1,8 @@
 import numpy as np
 import scipy.signal as signal
 import gymnasium as gym
+from scipy.optimize import minimize
+
 from gymnasium import spaces
 
 from typing import Any, SupportsFloat
@@ -14,7 +16,7 @@ class EnvLoadRL(gym.Env):
         # System parameters
         self.dt     = sys_params["dt"]      # Simulation step time [s]
         self.r      = sys_params["r"]       # Resistance [Ohm]
-        self.l      = sys_params["l"]      # Inductance [H]
+        self.l      = sys_params["l"]       # Inductance [H]
         vdc         = sys_params["vdc"]     # DC bus voltage [V]
 
         # Reward function type
@@ -27,7 +29,7 @@ class EnvLoadRL(gym.Env):
         self.i_max  = sys_params["i_max"]
 
         # Steady-state analysis functions
-        self.ss_analysis = SSAnalysis()
+        self.ss_analysis = SteadyStateAnalysis()
 
         # State-space system representation
         a = np.array([[-self.r / self.l]])
@@ -164,7 +166,7 @@ class EnvLoad3RL(gym.Env):
         self.i_max  = sys_params["i_max"]
 
         # Steady-state analysis functions
-        self.ss_analysis = SSAnalysis()
+        self.ss_analysis = SteadyStateAnalysis()
 
         # Limitations for the system
         # Actions
@@ -362,7 +364,7 @@ class EnvPMSM(gym.Env):
         self.i_max  = sys_params["i_max"]
 
         # Steady-state analysis functions
-        self.ss_analysis = SSAnalysis()
+        self.ss_analysis = SteadyStateAnalysis()
 
         # Limitations for the system
         # Actions
@@ -580,6 +582,7 @@ class EnvPMSMTC(gym.Env):
         self.lq     = sys_params["lq"]      # Q-axis Inductance [H]
         self.lambda_PM = sys_params["lambda_PM"]  # Flux-linkage due to permanent magnets [Wb]
         self.we_nom = sys_params["we_nom"]  # Nominal speed [rad/s]
+        self.p      = sys_params["p"]       # Pair of poles 
         vdc         = sys_params["vdc"]     # DC bus voltage [V]
 
         # Reward function type
@@ -600,7 +603,7 @@ class EnvPMSMTC(gym.Env):
         self.te_calculation = lambda id, iq: 3/2*sys_params["p"]*(self.psi_d(id)*iq - self.psi_q(iq)*id)
 
         # Steady-state analysis functions
-        self.ss_analysis = SSAnalysis()
+        self.ss_analysis = SteadyStateAnalysis(self.vdq_max, self.i_max)
 
         # Limitations for the system
         # Actions
@@ -760,47 +763,103 @@ class EnvPMSMTC(gym.Env):
         # Initialization currents
         # [id,iq]
         id_norm = self.np_random.uniform(low=low, high=high)
-        iq_lim  = np.sqrt(np.power(high,2)  - np.power(id_norm,2))
+        iq_lim  = np.sqrt(np.power(high, 2) - np.power(id_norm, 2))
         iq_norm = self.np_random.uniform(low=-iq_lim, high=iq_lim)
         # [te_ref]
         te_ref_norm = self.np_random.uniform(low=low, high=high)
-
-        # Overwrite predefined current values from options
-        if options:
-            id_norm      = np.float32(options.get("id_norm"))      if options.get("id_norm")      is not None else id_norm
-            iq_norm      = np.float32(options.get("iq_norm"))      if options.get("iq_norm")      is not None else iq_norm
-            te_ref_norm  = np.float32(options.get("te_ref_norm"))  if options.get("te_ref_norm")  is not None else te_ref_norm
-            prev_vd_norm = np.float32(options.get("prev_vd_norm")) if options.get("prev_vd_norm") is not None else None
-            prev_vq_norm = np.float32(options.get("prev_vq_norm")) if options.get("prev_vq_norm") is not None else None
-
-            self.prev_vd = prev_vd_norm * self.vdq_max if prev_vd_norm is not None and prev_vq_norm is not None else None
-            self.prev_vq = prev_vq_norm * self.vdq_max if prev_vd_norm is not None and prev_vq_norm is not None else None
-        else:
-            self.prev_vd = None
-            self.prev_vq = None
-
         
-        # Store idq, and idq_ref
-        self.id     = self.i_max * id_norm
-        self.iq     = self.i_max * iq_norm
-        self.te_ref = self.te_max * te_ref_norm
-        self.we     = self.we_nom * we_norm
-
-        # Calculate Te
-        te_norm = self.te_calculation(self.id, self.iq) / self.te_max
-
-        # Additional steps to store previous actions
-        if self.prev_vd is None or self.prev_vq is None:
-            n = 2
-            self.prev_vd = 0
-            self.prev_vq = 0
-            for _ in range(n):
-                obs, _, _, _, _ = self.step(action=self.action_space.sample())
+        # Overwrite values if provided in options
+        if options:
+            if "id_norm" in options:
+                id_norm = np.float32(options.get("id_norm"))
+            if "iq_norm" in options:
+                iq_norm = np.float32(options.get("iq_norm"))
+            if "te_ref_norm" in options:
+                te_ref_norm = np.float32(options.get("te_ref_norm"))
+            
+            # Initialize previous voltages if provided
+            if "prev_vd_norm" in options and "prev_vq_norm" in options:
+                prev_vd_norm = np.float32(options.get("prev_vd_norm"))
+                prev_vq_norm = np.float32(options.get("prev_vq_norm"))
+                
+                self.prev_vd = prev_vd_norm * self.vdq_max
+                self.prev_vq = prev_vq_norm * self.vdq_max
+            else:
+                self.prev_vd = self.prev_vq = None
         else:
+            self.prev_vd = self.prev_vq = None
+        
+        # Store dq currents and torque reference
+        self.id = self.i_max * id_norm
+        self.iq = self.i_max * iq_norm
+        self.te_ref = self.te_max * te_ref_norm
+        
+        # Convert dq currents to abc currents
+        self.ia, self.ib, self.ic = self.transformer.dq0_to_abc_direct(
+            self.id, self.iq, 0, self.theta_e
+        )
+        
+        # Calculate torque
+        te_norm = self.te_calculation(self.id, self.iq) / self.te_max
+        
+        # Initialize previous voltages if not set
+        if self.prev_vd is None or self.prev_vq is None:
+            n_init_steps = 2
+            self.prev_vd = self.prev_vq = 0
+            for _ in range(n_init_steps):
+                obs, _, _, _, _ = self.step(action=self.action_space.sample())
+            return obs, {}
+        else:
+            # Create observation if previous voltages were set
+            ia_norm = self.ia / self.i_max
+            ib_norm = self.ib / self.i_max
+            ic_norm = self.ic / self.i_max
+            prev_vd_norm = self.prev_vd / self.vdq_max
+            prev_vq_norm = self.prev_vq / self.vdq_max
+            
             # Observation: [te, te_ref, id, iq, we, prev_vd, prev_vq]
-            obs = np.array([te_norm, te_ref_norm, id_norm, iq_norm,  we_norm, prev_vd_norm, prev_vq_norm], dtype=np.float32)
-        return obs, {}
+            obs = np.array([
+                te_norm, te_ref_norm,
+                ia_norm, ib_norm, ic_norm,
+                we_norm,
+                prev_vd_norm, prev_vq_norm
+            ], dtype=np.float32)
+        
+        info = {}
+        info['mtpa_id'], info['mtpa_iq'] = self.mtpa()
+        return obs, info
 
+    def mtpa(self):
+        current_constraint = lambda idq: self.i_max**2 - (idq[0]**2 + idq[1]**2)
+        cost_function = lambda idq: idq[0]**2 + idq[1]**2
+
+        # Torque calculation
+        te_ref = self.te_calculation(self.id, self.iq)
+
+        # Initial guess
+        Id0 = 0
+        Iq0 = self.te_ref / (3/2*self.p**self.lambda_PM)
+
+        # Define constraint
+        current_constraint = {'type': 'ineq', 'fun': lambda idq: self.i_max**2 - (idq[0]**2 + idq[1]**2)}
+        torque_constraint = {'type': 'eq', 'fun': lambda idq: self.te_ref - self.te_calculation(idq[0], idq[1])}
+
+        # Solve MTPA optimization
+        result = minimize(
+            cost_function, 
+            [Id0, Iq0], 
+            method='SLSQP',
+            constraints=[current_constraint, torque_constraint],
+            bounds=[(-self.i_max, self.i_max), (-self.i_max, self.i_max)]  # id typically negative, iq positive for MTPA
+        )
+
+        optimal_currents = result.x
+        # print(f"Optimal currents: id = {optimal_currents[0]:.3f}, iq = {optimal_currents[1]:.3f}")
+        mtpa_id_ref = optimal_currents[0]
+        mtpa_iq_ref = optimal_currents[1]
+
+        return mtpa_id_ref, mtpa_iq_ref
+    
 class EnvPMSMDataBased(gym.Env):
     def __init__(self, sys_params, render_mode = None):
         # System parameters
@@ -813,11 +872,11 @@ class EnvPMSMDataBased(gym.Env):
         # Current-dependant parameters
         id = sys_params["id"]
         iq = sys_params["iq"]
-        self.ldd     = DataBasedParameter(id, iq, sys_params["ldd"])      # Self-inductance matrix d-frame [H]
-        self.ldq     = DataBasedParameter(id, iq, sys_params["ldq"])      # Cross-coupling inductance matrix dq-frame [H]
-        self.lqq     = DataBasedParameter(id, iq, sys_params["lqq"])      # Self-inductance matrix q-frame [H]
-        self.psid      = DataBasedParameter(id, iq, sys_params["psid"])   # Flux-linkage matrix d-frame [Wb]
-        self.psiq      = DataBasedParameter(id, iq, sys_params["psiq"])   # Flux-linkage matrix q-frame [Wb]
+        self.ldd  = DataBasedParameter(id, iq, sys_params["ldd"])      # Self-inductance matrix d-frame [H]
+        self.ldq  = DataBasedParameter(id, iq, sys_params["ldq"])      # Cross-coupling inductance matrix dq-frame [H]
+        self.lqq  = DataBasedParameter(id, iq, sys_params["lqq"])      # Self-inductance matrix q-frame [H]
+        self.psid = DataBasedParameter(id, iq, sys_params["psid"])   # Flux-linkage matrix d-frame [Wb]
+        self.psiq = DataBasedParameter(id, iq, sys_params["psiq"])   # Flux-linkage matrix q-frame [Wb]
 
         # Reward function type
         self.reward_function = sys_params["reward"]
@@ -829,7 +888,7 @@ class EnvPMSMDataBased(gym.Env):
         self.i_max  = sys_params["i_max"]
 
         # Steady-state analysis functions
-        self.ss_analysis = SSAnalysis()
+        self.ss_analysis = SteadyStateAnalysis()
 
         # Limitations for the system
         # Actions
@@ -1018,7 +1077,8 @@ class EnvPMSMDataBased(gym.Env):
             for _ in range(n):
                 obs, _, _, _, _ = self.step(action=self.action_space.sample())
 
-        return obs, {}
+        info = {}
+        return obs, info
     
     def state_space_discrete(self, id, iq):
         ldd = self.ldd.interp2d(id,iq)
@@ -1047,6 +1107,568 @@ class EnvPMSMDataBased(gym.Env):
 
         return ad, bdw
 
+class EnvPMSMTCABC(gym.Env):
+    """
+    Reinforcement Learning environment for Permanent Magnet Synchronous Motor (PMSM)
+    Torque Control in three-phase (abc) frame.
+    
+    This environment simulates a PMSM with:
+    - Three-phase stator windings (abc-frame)
+    - Torque control capabilities
+    - Clarke-Park transformations between abc and dq frames
+    - Accurate motor dynamics based on physical parameters
+    
+    The RL agent provides voltage commands and learns to control the motor torque
+    while minimizing current usage and voltage variations.
+    """
+    
+    def __init__(self, sys_params, render_mode=None):
+        """
+        Initialize the abc-frame PMSM Torque Control environment.
+        
+        Args:
+            sys_params (dict): Dictionary containing system parameters
+            render_mode (str, optional): Rendering mode
+        """
+        # Initialize system parameters
+        self._init_system_parameters(sys_params)
+        
+        # Initialize transformation and analysis tools
+        self._init_transformation_tools()
+        
+        # Define action and observation spaces
+        self._init_action_space()
+        self._init_observation_space()
+        
+        # Set render mode
+        self.render_mode = render_mode
+
+    def _init_system_parameters(self, sys_params):
+        """Initialize all system parameters from the provided dictionary."""
+        # Motor electrical parameters
+        self.dt = sys_params["dt"]  # Simulation step time [s]
+        self.r = sys_params["r"]  # Phase Stator Resistance [Ohm]
+        self.ld = sys_params["ld"]  # D-axis Inductance [H]
+        self.lq = sys_params["lq"]  # Q-axis Inductance [H]
+        self.lambda_PM = sys_params["lambda_PM"]  # Flux-linkage due to permanent magnets [Wb]
+        self.p = sys_params["p"]  # Pair of poles 
+        
+        # Operational parameters
+        self.we_nom = sys_params["we_nom"]  # Nominal speed [rad/s]
+        self.vdc = sys_params["vdc"]  # DC bus voltage [V]
+        self.i_max = sys_params["i_max"]  # Maximum current [A]
+        self.te_max = sys_params["te_max"]  # Maximum torque [Nm]
+        
+        # Voltage limits derived from DC bus
+        self.vabc_max = self.vdc/2
+        self.vdq_max = self.vdc/2
+        
+        # Reward function configuration
+        self.reward_function = sys_params["reward"]
+        
+        # State variables initialization
+        self.theta_e = 0.0  # Electrical angle [rad]
+        self.id = self.iq = 0.0  # dq-frame currents
+        self.ia = self.ib = self.ic = 0.0  # abc-frame currents
+        self.we = 0.0  # Electrical angular velocity [rad/s]
+        self.te_ref = 0.0  # Reference torque [Nm]
+        self.prev_va = self.prev_vb = self.prev_vc = 0.0  # Previous voltages
+
+    def _init_transformation_tools(self):
+        """Initialize transformation tools and motor dynamics functions."""
+        # Clarke-Park transformation for abc<->dq conversions
+        self.transformer = ClarkeParkTransform()
+        
+        # Flux and torque calculation functions
+        self.psi_d = lambda id: self.ld*id + self.lambda_PM
+        self.psi_q = lambda iq: self.lq*iq
+        self.te_calculation = lambda id, iq: 3/2*self.p*(self.psi_d(id)*iq - self.psi_q(iq)*id)
+        
+        # Steady-state analysis tool
+        self.ss_analysis = SteadyStateAnalysis(self.vdq_max, self.i_max)
+
+    def _init_action_space(self):
+        """Initialize the action space for three-phase voltages."""
+        # Define normalized voltage limits for each phase [-1, 1]
+        self.min_va, self.max_va = [-1.0, 1.0]
+        self.min_vb, self.max_vb = [-1.0, 1.0]
+        self.min_vc, self.max_vc = [-1.0, 1.0]
+        
+        # Define action bounds arrays
+        self.low_actions = np.array(
+            [self.min_va, self.min_vb, self.min_vc], dtype=np.float32
+        )
+        self.high_actions = np.array(
+            [self.max_va, self.max_vb, self.max_vc], dtype=np.float32
+        )
+        
+        # Create action space
+        self.action_space = spaces.Box(
+            low=self.low_actions, high=self.high_actions, shape=(3,), dtype=np.float32
+        )
+
+    def _init_observation_space(self):
+        """Initialize the observation space."""
+        # Define normalized observation bounds
+        self.min_te, self.max_te = [-1.0, 1.0]
+        self.min_ref_te, self.max_ref_te = [-1.0, 1.0]
+        self.min_ia, self.max_ia = [-1.0, 1.0]
+        self.min_ib, self.max_ib = [-1.0, 1.0]
+        self.min_ic, self.max_ic = [-1.0, 1.0]
+        self.min_we, self.max_we = [-1.0, 1.0]
+        self.min_va, self.max_va = [-1.0, 1.0]
+        self.min_vb, self.max_vb = [-1.0, 1.0]
+        self.min_vc, self.max_vc = [-1.0, 1.0]
+        
+        # Observation bounds arrays: [te, te_ref, ia, ib, ic, we, prev_va, prev_vb, prev_vc]
+        self.low_observations = np.array(
+            [self.min_te, self.min_ref_te, 
+             self.min_ia, self.min_ib, self.min_ic, 
+             self.min_we, 
+             self.min_va, self.min_vb, self.min_vc], 
+            dtype=np.float32
+        )
+        self.high_observations = np.array(
+            [self.max_te, self.max_ref_te, 
+             self.max_ia, self.max_ib, self.max_ic, 
+             self.max_we, 
+             self.max_va, self.max_vb, self.max_vc], 
+            dtype=np.float32
+        )
+        
+        # Create observation space
+        self.observation_space = spaces.Box(
+            low=self.low_observations, high=self.high_observations, shape=(9,), dtype=np.float32
+        )
+
+    def step(self, action):
+        """
+        Execute one time step within the environment.
+        
+        Args:
+            action (numpy.ndarray): Three-phase voltage commands [va, vb, vc]
+            
+        Returns:
+            tuple: (observation, reward, terminated, truncated, info)
+        """
+        # Process action and update system state
+        va_t, vb_t, vc_t = self._process_action(action)
+        self._update_electrical_angle()
+        self._update_motor_state(va_t, vb_t, vc_t)
+        
+        # Generate observation
+        obs = self._get_observation()
+        
+        # Calculate reward based on current state
+        reward = self._calculate_reward(obs[0], obs[1], action)
+        
+        # Environment doesn't terminate
+        terminated = False
+        truncated = False
+        
+        return obs, reward, terminated, truncated, {}
+    
+    def _process_action(self, action):
+        """
+        Process and limit the input action.
+        
+        Args:
+            action (numpy.ndarray): Three-phase voltage commands normalized to [-1, 1]
+            
+        Returns:
+            tuple: (va, vb, vc) - The processed voltage commands
+        """
+        # Denormalize action (scale from [-1,1] to actual voltage)
+        action_vabc = self.vabc_max * action
+        
+        # Calculate if the magnitude exceeds the limit
+        norm_vabc = np.sqrt(np.sum(np.power(action_vabc, 2)))
+        factor_vabc = self.vabc_max / norm_vabc if norm_vabc > self.vabc_max else 1
+        
+        # Apply limiting factor
+        va, vb, vc = factor_vabc * action_vabc
+        
+        # Store these values for next step
+        self.prev_va, self.prev_vb, self.prev_vc = va, vb, vc
+        
+        return va, vb, vc
+        
+    def _update_electrical_angle(self):
+        """Update the electrical angle based on the current speed."""
+        self.theta_e += self.we * self.dt
+        self.theta_e = self.theta_e % (2 * np.pi)  # Keep angle within [0, 2π]
+        
+    def _update_motor_state(self, va, vb, vc):
+        """
+        Update motor state based on applied voltages.
+        
+        Args:
+            va (float): Phase A voltage
+            vb (float): Phase B voltage
+            vc (float): Phase C voltage
+        """
+        # Convert abc voltages to dq voltages for simulation
+        vd, vq, _ = self.transformer.abc_to_dq0_direct(va, vb, vc, self.theta_e)
+        vdq = np.array([vd, vq])
+        
+        # Get current state in dq frame and apply system dynamics
+        idq = np.array([self.id, self.iq])
+        idq_next = self._apply_motor_dynamics(idq, vdq)
+        
+        # Apply current limiting if needed
+        idq_next = self._apply_current_limit(idq_next)
+        
+        # Update state variables
+        self.id, self.iq = idq_next
+        
+        # Convert dq currents to abc currents
+        self.ia, self.ib, self.ic = self.transformer.dq0_to_abc_direct(
+            self.id, self.iq, 0, self.theta_e
+        )
+    
+    def _apply_motor_dynamics(self, idq, vdq):
+        """
+        Apply motor dynamics in the dq reference frame.
+        
+        Args:
+            idq (numpy.ndarray): Current state [id, iq]
+            vdq (numpy.ndarray): Input voltages [vd, vq]
+            
+        Returns:
+            numpy.ndarray: Next state [id_next, iq_next]
+        """
+        # Apply discrete state-space model: idq(t+1) = ad*idq(t) + bd*vdq(t) + wd
+        idq_next = self.ad @ idq + self.bd @ vdq + self.wd
+        return idq_next
+    
+    def _apply_current_limit(self, idq):
+        """
+        Apply current limiting to ensure currents stay within bounds.
+        
+        Args:
+            idq (numpy.ndarray): Current state [id, iq]
+            
+        Returns:
+            numpy.ndarray: Limited current state [id_limited, iq_limited]
+        """
+        # Calculate current magnitude
+        id_next, iq_next = idq
+        i_mag = np.sqrt(id_next**2 + iq_next**2)
+        
+        # Apply limiting if needed
+        if i_mag > self.i_max:
+            scaling_factor = self.i_max / i_mag
+            return scaling_factor * idq
+        
+        return idq
+        
+    def _get_observation(self):
+        """
+        Construct the observation vector.
+        
+        Returns:
+            numpy.ndarray: The observation vector for the agent
+        """
+        # Calculate torque
+        te = self.te_calculation(self.id, self.iq)
+        
+        # Normalize observations
+        te_norm = te / self.te_max
+        te_ref_norm = self.te_ref / self.te_max
+        ia_norm = self.ia / self.i_max
+        ib_norm = self.ib / self.i_max
+        ic_norm = self.ic / self.i_max
+        we_norm = self.we / self.we_nom
+        prev_va_norm = self.prev_va / self.vabc_max
+        prev_vb_norm = self.prev_vb / self.vabc_max
+        prev_vc_norm = self.prev_vc / self.vabc_max
+        
+        # Construct observation vector
+        obs = np.array([
+            te_norm, te_ref_norm,
+            ia_norm, ib_norm, ic_norm,
+            we_norm,
+            prev_va_norm, prev_vb_norm, prev_vc_norm
+        ], dtype=np.float32)
+        
+        return obs
+
+    def _calculate_reward(self, te_norm, te_ref_norm, action):
+        """
+        Calculate the reward based on torque error, current magnitude and voltage changes.
+        
+        Args:
+            te_norm (float): Normalized torque
+            te_ref_norm (float): Normalized reference torque
+            action (numpy.ndarray): Current action [va, vb, vc]
+            
+        Returns:
+            float: Calculated reward
+        """
+        # Calculate torque tracking error
+        e_te = np.abs(te_norm - te_ref_norm)
+        
+        # Calculate current magnitude (using dq for simplicity)
+        i_dq_mag = np.sqrt(np.power(self.id, 2) + np.power(self.iq, 2)) / self.i_max
+        
+        # Calculate voltage changes
+        prev_va_norm = self.prev_va / self.vabc_max
+        prev_vb_norm = self.prev_vb / self.vabc_max
+        prev_vc_norm = self.prev_vc / self.vabc_max
+        
+        delta_va = np.abs(action[0] - prev_va_norm)
+        delta_vb = np.abs(action[1] - prev_vb_norm)
+        delta_vc = np.abs(action[2] - prev_vc_norm)
+        
+        # Weighting factors
+        w_idq = 0.1  # Weight for current magnitude
+        w_vabc = 0.1  # Weight for voltage changes
+        
+        # Calculate reward based on selected reward function
+        return self._compute_reward_by_type(e_te, i_dq_mag, delta_va, delta_vb, delta_vc, w_idq, w_vabc)
+    
+    def _compute_reward_by_type(self, e_te, i_dq_mag, delta_va, delta_vb, delta_vc, w_idq, w_vabc):
+        """
+        Compute reward based on the specified reward function type.
+        
+        Args:
+            e_te (float): Torque error
+            i_dq_mag (float): Normalized current magnitude
+            delta_va, delta_vb, delta_vc (float): Voltage changes
+            w_idq (float): Current magnitude weight
+            w_vabc (float): Voltage change weight
+            
+        Returns:
+            float: Calculated reward
+        """
+        if self.reward_function == "absolute":
+            return -(e_te + w_idq * i_dq_mag + w_vabc * (delta_va + delta_vb + delta_vc))
+            
+        elif self.reward_function == "quadratic":
+            return -(np.power(e_te, 2) + w_idq * np.power(i_dq_mag, 2) + 
+                    w_vabc * (np.power(delta_va, 2) + np.power(delta_vb, 2) + np.power(delta_vc, 2)))
+                    
+        elif self.reward_function == "quadratic_2":
+            return -(np.power(e_te, 2) + w_idq * np.power(i_dq_mag, 2) + 
+                    w_vabc * np.power(delta_va + delta_vb + delta_vc, 2))
+                    
+        elif self.reward_function == "square_root":
+            return -(np.power(e_te, 1/2) + w_idq * np.power(i_dq_mag, 1/2) + 
+                    w_vabc * (np.power(delta_va, 1/2) + np.power(delta_vb, 1/2) + np.power(delta_vc, 1/2)))
+                    
+        elif self.reward_function == "square_root_2":
+            return -(np.power(e_te, 1/2) + w_idq * np.power(i_dq_mag, 1/2) + 
+                    w_vabc * np.power(delta_va + delta_vb + delta_vc, 1/2))
+                    
+        elif self.reward_function == "quartic_root":
+            return -(np.power(e_te, 1/4) + w_idq * np.power(i_dq_mag, 1/4) + 
+                    w_vabc * (np.power(delta_va, 1/4) + np.power(delta_vb, 1/4) + np.power(delta_vc, 1/4)))
+                    
+        elif self.reward_function == "quartic_root_2":
+            return -(np.power(e_te, 1/4) + w_idq * np.power(i_dq_mag, 1/4) + 
+                    w_vabc * np.power(delta_va + delta_vb + delta_vc, 1/4))
+                    
+        else:
+            raise ValueError(f"Unknown reward function: {self.reward_function}")
+
+    def reset(self, *, seed=None, options=None):
+        """
+        Reset the environment to an initial state.
+        
+        Args:
+            seed (int, optional): Random seed for reproducibility
+            options (dict, optional): Additional options for customization
+            
+        Returns:
+            tuple: (observation, info)
+        """
+        super().reset(seed=seed)
+        
+        # Initialize motor variables
+        self._initialize_motor_variables(options)
+        
+        # Set up state-space model
+        self._setup_state_space_model()
+        
+        # Convert dq currents to abc currents
+        self.ia, self.ib, self.ic = self.transformer.dq0_to_abc_direct(
+            self.id, self.iq, 0, self.theta_e
+        )
+        
+        # Initialize previous voltages or do warmup steps
+        if self._need_warmup_steps():
+            return self._perform_warmup_steps()
+        else:
+            return self._create_observation_and_info()
+    
+    def _initialize_motor_variables(self, options):
+        """
+        Initialize motor variables, potentially using provided options.
+        
+        Args:
+            options (dict, optional): Initialization options
+        """
+        # Boundary for initialization values
+        low, high = 0.9 * np.array([-1, 1])
+        
+        # Initialize with random values
+        we_norm = self.np_random.uniform(low=0, high=high)
+        self.theta_e = self.np_random.uniform(low=0, high=2*np.pi)
+        id_norm = self.np_random.uniform(low=low, high=high)
+        iq_lim = np.sqrt(np.power(high, 2) - np.power(id_norm, 2))
+        iq_norm = self.np_random.uniform(low=-iq_lim, high=iq_lim)
+        te_ref_norm = self.np_random.uniform(low=low, high=high)
+        
+        # Overwrite with options if provided
+        if options:
+            we_norm = np.float32(options.get("we_norm", we_norm))
+            self.theta_e = np.float32(options.get("theta_e", self.theta_e))
+            id_norm = np.float32(options.get("id_norm", id_norm))
+            iq_norm = np.float32(options.get("iq_norm", iq_norm))
+            te_ref_norm = np.float32(options.get("te_ref_norm", te_ref_norm))
+            
+            # Initialize previous voltages if provided
+            if all(k in options for k in ["prev_va_norm", "prev_vb_norm", "prev_vc_norm"]):
+                prev_va_norm = np.float32(options["prev_va_norm"])
+                prev_vb_norm = np.float32(options["prev_vb_norm"])
+                prev_vc_norm = np.float32(options["prev_vc_norm"])
+                
+                self.prev_va = prev_va_norm * self.vabc_max
+                self.prev_vb = prev_vb_norm * self.vabc_max
+                self.prev_vc = prev_vc_norm * self.vabc_max
+            else:
+                self.prev_va = self.prev_vb = self.prev_vc = None
+        else:
+            self.prev_va = self.prev_vb = self.prev_vc = None
+        
+        # Set denormalized values
+        self.we = self.we_nom * we_norm
+        self.id = self.i_max * id_norm
+        self.iq = self.i_max * iq_norm
+        self.te_ref = self.te_max * te_ref_norm
+    
+    def _setup_state_space_model(self):
+        """Set up the discrete state-space model for the motor."""
+        # dq-frame continuous state-space model matrices
+        a = np.array([
+            [-self.r / self.ld, self.we * self.lq / self.ld],
+            [-self.we * self.ld / self.lq, -self.r / self.lq]
+        ])
+        b = np.array([
+            [1 / self.ld, 0],
+            [0, 1 / self.lq]
+        ])
+        w = np.array([[0], [-self.we * self.lambda_PM]])
+        c = np.eye(2)
+        d = np.zeros((2, 2))
+        
+        # Augment system for discrete conversion
+        bw = np.hstack((b, w))
+        dw = np.hstack((d, np.zeros((2, 1))))
+        
+        # Convert to discrete time model
+        (ad, bdw, _, _, _) = signal.cont2discrete((a, bw, c, dw), self.dt, method='zoh')
+        
+        # Store discrete system matrices
+        self.ad = ad
+        self.bd = bdw[:, :b.shape[1]]
+        self.wd = bdw[:, b.shape[1]:].squeeze()
+    
+    def _need_warmup_steps(self):
+        """Check if warmup steps are needed."""
+        return self.prev_va is None or self.prev_vb is None or self.prev_vc is None
+    
+    def _perform_warmup_steps(self):
+        """Perform warmup steps to initialize previous actions."""
+        n_init_steps = 2
+        self.prev_va = self.prev_vb = self.prev_vc = 0
+        
+        for _ in range(n_init_steps):
+            obs, _, _, _, _ = self.step(action=self.action_space.sample())
+            
+        return obs, {}
+    
+    def _create_observation_and_info(self):
+        """Create observation and info dictionaries without warmup steps."""
+        # Calculate torque
+        te = self.te_calculation(self.id, self.iq)
+        te_norm = te / self.te_max
+        
+        # Normalize observations
+        te_ref_norm = self.te_ref / self.te_max
+        ia_norm = self.ia / self.i_max
+        ib_norm = self.ib / self.i_max
+        ic_norm = self.ic / self.i_max
+        we_norm = self.we / self.we_nom
+        prev_va_norm = self.prev_va / self.vabc_max
+        prev_vb_norm = self.prev_vb / self.vabc_max
+        prev_vc_norm = self.prev_vc / self.vabc_max
+        
+        # Observation: [te, te_ref, ia, ib, ic, we, prev_va, prev_vb, prev_vc]
+        obs = np.array([
+            te_norm, te_ref_norm,
+            ia_norm, ib_norm, ic_norm,
+            we_norm,
+            prev_va_norm, prev_vb_norm, prev_vc_norm
+        ], dtype=np.float32)
+        
+        # Create info dictionary with MTPA values
+        info = {}
+        info['mtpa_id'], info['mtpa_iq'] = self.mtpa()
+        
+        return obs, info
+
+    def mtpa(self):
+        """
+        Calculate Maximum Torque Per Ampere (MTPA) current references.
+        
+        Returns:
+            tuple: (id_ref, iq_ref) - Optimal d and q axis currents for MTPA
+        """
+        return self._solve_mtpa_optimization(self.te_ref)
+    
+    def _solve_mtpa_optimization(self, torque_reference):
+        """
+        Solve the MTPA optimization problem.
+        
+        Args:
+            torque_reference (float): Target torque [Nm]
+            
+        Returns:
+            tuple: (id_ref, iq_ref) - Optimal currents
+        """
+        # Setup cost function to minimize current magnitude
+        cost_function = lambda idq: idq[0]**2 + idq[1]**2
+        
+        # Initial guess (typical for PMSM: id=0, iq calculated for desired torque)
+        id0 = 0
+        iq0 = torque_reference / (3/2 * self.p * self.lambda_PM)
+        
+        # Define constraints
+        # 1. Current magnitude constraint
+        current_constraint = {
+            'type': 'ineq', 
+            'fun': lambda idq: self.i_max**2 - (idq[0]**2 + idq[1]**2)
+        }
+        
+        # 2. Torque constraint
+        torque_constraint = {
+            'type': 'eq', 
+            'fun': lambda idq: torque_reference - self.te_calculation(idq[0], idq[1])
+        }
+        
+        # Solve optimization problem
+        result = minimize(
+            cost_function, 
+            [id0, iq0], 
+            method='SLSQP',
+            constraints=[current_constraint, torque_constraint],
+            bounds=[(-self.i_max, self.i_max), (-self.i_max, self.i_max)]
+        )
+        
+        # Return optimal currents
+        return result.x[0], result.x[1]
+    
     
 if __name__ == "__main__":
     # Environment
