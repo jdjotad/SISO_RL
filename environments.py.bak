@@ -556,6 +556,7 @@ class EnvPMSM(gym.Env):
             self.prev_vd = None
             self.prev_vq = None
 
+        
         # Store idq, and idq_ref
         self.id     = self.i_max * id_norm
         self.iq     = self.i_max * iq_norm
@@ -1391,11 +1392,10 @@ class EnvPMSMTCABC(gym.Env):
         ], dtype=np.float32)
         
         return obs
-        
+
     def _calculate_reward(self, te_norm, te_ref_norm, action):
         """
-        Calculate the reward based on torque error, current magnitude, and promoting constant dq voltages
-        without directly using angles.
+        Calculate the reward based on torque error, current magnitude and voltage changes.
         
         Args:
             te_norm (float): Normalized torque
@@ -1408,82 +1408,65 @@ class EnvPMSMTCABC(gym.Env):
         # Calculate torque tracking error
         e_te = np.abs(te_norm - te_ref_norm)
         
-        # Calculate current magnitude using abc-frame variables instead of dq
-        # In a balanced three-phase system, the RMS value is sqrt(ia²+ib²+ic²)/sqrt(3)
-        # and the magnitude is sqrt(ia²+ib²+ic²)
-        i_abc_mag = np.sqrt(np.power(self.ia, 2) + np.power(self.ib, 2) + np.power(self.ic, 2)) / self.i_max
+        # Calculate current magnitude (using dq for simplicity)
+        i_dq_mag = np.sqrt(np.power(self.id, 2) + np.power(self.iq, 2)) / self.i_max
         
-        # Calculate voltage changes in abc frame
+        # Calculate voltage changes
         prev_va_norm = self.prev_va / self.vabc_max
         prev_vb_norm = self.prev_vb / self.vabc_max
         prev_vc_norm = self.prev_vc / self.vabc_max
         
-        # Calculate dq voltage constancy metrics using the abc variables
-        # We'll use invariant properties of symmetrical three-phase systems:
-        # 1. Voltage magnitude stability: v_a²+v_b²+v_c² should be constant
-        # 2. Phase angle relationships: 120° phase shifts should be maintained
-        
-        # Current and previous voltage magnitudes (3-phase RMS)
-        v_rms_curr = np.sqrt((action[0]**2 + action[1]**2 + action[2]**2)/3)
-        v_rms_prev = np.sqrt((prev_va_norm**2 + prev_vb_norm**2 + prev_vc_norm**2)/3)
-        delta_v_rms = np.abs(v_rms_curr - v_rms_prev)
-        
-        # Phase voltage relationship metric (should remain constant for balanced system)
-        # We use dot products to capture the angular relationships without explicit angles
-        va_vb_curr = action[0] * action[1]  # Dot product of va and vb (captures angle)
-        vb_vc_curr = action[1] * action[2]  # Dot product of vb and vc
-        vc_va_curr = action[2] * action[0]  # Dot product of vc and va
-        
-        va_vb_prev = prev_va_norm * prev_vb_norm
-        vb_vc_prev = prev_vb_norm * prev_vc_norm
-        vc_va_prev = prev_vc_norm * prev_va_norm
-        
-        # Changes in phase relationships
-        delta_va_vb = np.abs(va_vb_curr - va_vb_prev)
-        delta_vb_vc = np.abs(vb_vc_curr - vb_vc_prev)
-        delta_vc_va = np.abs(vc_va_curr - vc_va_prev)
-        
-        # Symmetry metric (for balanced system, these should be equal)
-        phase_balance = np.abs(va_vb_curr - vb_vc_curr) + np.abs(vb_vc_curr - vc_va_curr)
-        
-        # Combine metrics for dq constancy without using angle
-        dq_constancy = delta_v_rms + 0.5 * (delta_va_vb + delta_vb_vc + delta_vc_va) + 0.5 * phase_balance
+        delta_va = np.abs(action[0] - prev_va_norm)
+        delta_vb = np.abs(action[1] - prev_vb_norm)
+        delta_vc = np.abs(action[2] - prev_vc_norm)
         
         # Weighting factors
-        w_iabc = 0.1  # Weight for current magnitude
-        w_dq_const = 0.2  # Weight for dq constancy
+        w_idq = 0.1  # Weight for current magnitude
+        w_vabc = 0.1  # Weight for voltage changes
         
-        # Calculate reward based on selected reward function type
+        # Calculate reward based on selected reward function
+        return self._compute_reward_by_type(e_te, i_dq_mag, delta_va, delta_vb, delta_vc, w_idq, w_vabc)
+    
+    def _compute_reward_by_type(self, e_te, i_dq_mag, delta_va, delta_vb, delta_vc, w_idq, w_vabc):
+        """
+        Compute reward based on the specified reward function type.
+        
+        Args:
+            e_te (float): Torque error
+            i_dq_mag (float): Normalized current magnitude
+            delta_va, delta_vb, delta_vc (float): Voltage changes
+            w_idq (float): Current magnitude weight
+            w_vabc (float): Voltage change weight
+            
+        Returns:
+            float: Calculated reward
+        """
         if self.reward_function == "absolute":
-            return -(e_te + w_iabc * i_abc_mag + w_dq_const * dq_constancy)
+            return -(e_te + w_idq * i_dq_mag + w_vabc * (delta_va + delta_vb + delta_vc))
             
         elif self.reward_function == "quadratic":
-            return -(np.power(e_te, 2) + w_iabc * np.power(i_abc_mag, 2) + 
-                    w_dq_const * np.power(dq_constancy, 2))
+            return -(np.power(e_te, 2) + w_idq * np.power(i_dq_mag, 2) + 
+                    w_vabc * (np.power(delta_va, 2) + np.power(delta_vb, 2) + np.power(delta_vc, 2)))
                     
         elif self.reward_function == "quadratic_2":
-            return -(np.power(e_te, 2) + w_iabc * np.power(i_abc_mag, 2) + 
-                    w_dq_const * np.power(dq_constancy, 2))
+            return -(np.power(e_te, 2) + w_idq * np.power(i_dq_mag, 2) + 
+                    w_vabc * np.power(delta_va + delta_vb + delta_vc, 2))
                     
         elif self.reward_function == "square_root":
-            return -(np.power(e_te, 1/2) + w_iabc * np.power(i_abc_mag, 1/2) + 
-                    w_dq_const * np.power(dq_constancy, 1/2))
+            return -(np.power(e_te, 1/2) + w_idq * np.power(i_dq_mag, 1/2) + 
+                    w_vabc * (np.power(delta_va, 1/2) + np.power(delta_vb, 1/2) + np.power(delta_vc, 1/2)))
                     
         elif self.reward_function == "square_root_2":
-            return -(np.power(e_te, 1/2) + w_iabc * np.power(i_abc_mag, 1/2) + 
-                    w_dq_const * np.power(dq_constancy, 1/2))
+            return -(np.power(e_te, 1/2) + w_idq * np.power(i_dq_mag, 1/2) + 
+                    w_vabc * np.power(delta_va + delta_vb + delta_vc, 1/2))
                     
         elif self.reward_function == "quartic_root":
-            return -(np.power(e_te, 1/4) + w_iabc * np.power(i_abc_mag, 1/4) + 
-                    w_dq_const * np.power(dq_constancy, 1/4))
+            return -(np.power(e_te, 1/4) + w_idq * np.power(i_dq_mag, 1/4) + 
+                    w_vabc * (np.power(delta_va, 1/4) + np.power(delta_vb, 1/4) + np.power(delta_vc, 1/4)))
                     
         elif self.reward_function == "quartic_root_2":
-            return -(np.power(e_te, 1/4) + w_iabc * np.power(i_abc_mag, 1/4) + 
-                    w_dq_const * np.power(dq_constancy, 1/4))
-                    
-        elif self.reward_function == "constant_dq":
-            # Special reward focused primarily on dq constancy
-            return -(e_te + 0.05 * i_abc_mag + 0.5 * dq_constancy)
+            return -(np.power(e_te, 1/4) + w_idq * np.power(i_dq_mag, 1/4) + 
+                    w_vabc * np.power(delta_va + delta_vb + delta_vc, 1/4))
                     
         else:
             raise ValueError(f"Unknown reward function: {self.reward_function}")
