@@ -398,7 +398,7 @@ class PlotTest():
         plt.pause(0.001)  # pause a bit so that plots are updated
 
 
-    def plot_three_phase(self, idx, observations, actions, reward, env_name, model_name, reward_type, speed=None):
+    def plot_three_phase(self, idx, observations, actions, reward, env_name, model_name, reward_type, speed=None, save=False, show=False):
         # plt.clf()
         plt.close()
         if speed is not None:
@@ -409,7 +409,10 @@ class PlotTest():
         fig.set_figheight(6)
         fig.set_figwidth(10)
         ax.set_title("State vs step")
-        ax.plot(observations, label=['Id', 'Iq', 'Idref', 'Iqref'])
+        if env_name == "PMSMTC":
+            ax.plot(observations, label=['Te', 'Teref', 'Id', 'Iq'])
+        else:
+            ax.plot(observations, label=['Id', 'Iq', 'Idref', 'Iqref'])
         box = ax.get_position()
         ax.set_position([box.x0, box.y0 + box.height * 0.1,
                          box.width, box.height * 0.9])
@@ -432,12 +435,15 @@ class PlotTest():
         ax.set_position([box.x0, box.y0 + box.height * 0.1,
                          box.width, box.height * 0.9])
         
-        if not os.path.exists(f"plots/{env_name}/{reward_type}/"):
-            os.makedirs(f"plots/{env_name}/{reward_type}/")
-        plt.savefig(f"plots/{env_name}/{reward_type}/{model_name}_{idx}.pdf", bbox_inches='tight')
-        # plt.pause(0.001)  # pause a bit so that plots are updated
+        if save:
+            if not os.path.exists(f"plots/{env_name}/{reward_type}/"):
+                os.makedirs(f"plots/{env_name}/{reward_type}/")
+            plt.savefig(f"plots/{env_name}/{reward_type}/{model_name}_{idx}.pdf", bbox_inches='tight')
+        
+        if show:
+            plt.pause(0.001)  # pause a bit so that plots are updated
 
-        # plt.show()
+            plt.show()
 
     def plot_test_2(self, id, iq, speed):
         plt.figure()
@@ -517,29 +523,35 @@ class Metrics():
         return np.abs((ss_val - ref))
 
 class RewardLoggingCallback(EventCallback):
-    def __init__(self, csv_file="reward_log.csv", verbose=0):
+    def __init__(self, csv_file="reward_log.csv", log_interval=1, verbose=0):
         super(RewardLoggingCallback, self).__init__(verbose = verbose)
         self.csv_file = csv_file
-        self.episode_rewards = []
-        self.episode_lengths = []
+        self.log_interval = log_interval
+        self.avg_rewards = []
 
+        self.episode_counter = 0
+        self.episode_acc_rewards = 0
     def _on_step(self) -> bool:
-        # Check if a new episode has ended
         infos = self.locals["infos"]
         for info in infos:
             if "episode" in info:  # Check if episode info is available
-                ep_reward = info["episode"]["r"]  # Total episode reward
-                ep_length = info["episode"]["l"]  # Episode length
-                avg_reward_per_step = ep_reward / ep_length  # Compute avg reward per step
+                ep_reward = info["episode"]["r"]
+                self.episode_acc_rewards += ep_reward
 
-                self.episode_rewards.append(avg_reward_per_step)
-                self._save_to_csv(avg_reward_per_step)
+                self.episode_counter += 1
+                if self.episode_counter == self.log_interval:
+                    avg_reward = self.episode_acc_rewards / self.log_interval
+                    self.avg_rewards.append(avg_reward)
+
+                    self.episode_counter = 0
+                    self.episode_acc_rewards = 0
+
 
         return True
 
-    def _save_to_csv(self, avg_reward):
-        df = pd.DataFrame({"average_reward_per_step": [avg_reward]})
-        df.to_csv(self.csv_file, mode='a', index=False, header=not hasattr(self, "_header_written"))
+    def _save_to_csv(self):
+        df = pd.DataFrame({"average_reward_per_step": self.avg_rewards})
+        df.to_csv(self.csv_file, mode='w', index=False, header=not hasattr(self, "_header_written"))
         self._header_written = True  # Ensure header is written only once
 
 class DataBasedParameter:

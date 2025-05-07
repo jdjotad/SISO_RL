@@ -346,21 +346,17 @@ class PowerElectronicsHardware:
     to actual inverter output voltages.
     """
     
-    def __init__(self, dc_voltage, time_step, electrical_freq, carrier_steps=100, pwm_strategy="SPWM"):
+    def __init__(self, dc_voltage, time_step, electrical_speed, carrier_steps=100, pwm_strategy="SPWM"):
         """
         Initialize the power electronics hardware simulator.
         
         Args:
             dc_voltage: DC link voltage [V]
             time_step: Simulation time step [s]
-            electrical_freq: Electrical frequency [rad/s]
+            electrical_speed: Electrical speed [rad/s]
             carrier_steps: PWM carrier steps per period
             pwm_strategy: PWM strategy ("SPWM" or "SVPWM")
         """
-        # Components
-        from ClarkeParTransform import ClarkeParTransform
-        from PulseWidthModulation import PulseWidthModulation
-        from TwoLevelInverter import TwoLevelInverter
         
         # Initialize component objects
         clarke_park = ClarkeParTransform()
@@ -375,7 +371,7 @@ class PowerElectronicsHardware:
         
         # System parameters
         self.time_step = time_step
-        self.electrical_freq = electrical_freq
+        self.electrical_speed = electrical_speed
         
         # State variables
         self.current_time = 0.0
@@ -402,7 +398,7 @@ class PowerElectronicsHardware:
         self.current_time += self.time_step
         
         # Calculate current angle
-        current_angle = self.electrical_freq * self.current_time
+        current_angle = self.electrical_speed * self.current_time
         
         # Convert d-q references to three-phase voltage references
         voltage_a_ref, voltage_b_ref, voltage_c_ref = self.dq_to_abc(
@@ -427,9 +423,8 @@ class PowerElectronicsHardware:
         
         return voltage_d_actual, voltage_q_actual
 
-class StateSpaceAnalysis:
+class SteadyStateAnalysis:
     """
-    Class for analyzing state-space models of electrical systems.
     Provides methods to calculate steady-state responses and visualize
     operating limits in continuous and discrete domains.
     """
@@ -678,8 +673,6 @@ class StateSpaceAnalysis:
         plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.05),
                    fancybox=True, shadow=True, ncol=2)
         
-import numpy as np
-
 class ControlSystemMetrics:
     def __init__(self, sampling_time):
         """

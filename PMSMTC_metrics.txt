@@ -1,0 +1,61 @@
+Model: PMSMTC - Reward function: absolute - Episodes: 5
+Average settling steps: 6.00 [steps]
+Average settling time: 0.60 [ms]
+Average overshoot id: 0.37 %
+Average overshoot iq: 0.00 %
+Average undershoot id: 0.00 %
+Average undershoot iq: 0.00 %
+Average steady-state error id / reference: 158.15 %
+Average steady-state error iq / reference: 74.38 %
+Average steady-state error id / Imax: 0.15 %
+Average steady-state error iq / Imax: 0.15 %
+Error in episode 0: Id = 144.83 % / Iq = 92.41 %
+Error in episode 1: Id = 4.63 % / Iq = 14.96 %
+Error in episode 2: Id = 13.45 % / Iq = 14.36 %
+Error in episode 3: Id = 130.83 % / Iq = 153.96 %
+Error in episode 4: Id = 497.02 % / Iq = 96.21 %
+Model: PMSMTC - Reward function: absolute - Episodes: 5
+Average settling steps: 7.60 [steps]
+Average settling time: 0.76 [ms]
+Average overshoot id: 0.35 %
+Average overshoot iq: 0.00 %
+Average undershoot id: 0.00 %
+Average undershoot iq: 0.00 %
+Average steady-state error id / reference: 269.31 %
+Average steady-state error iq / reference: 82.57 %
+Average steady-state error id / Imax: 0.13 %
+Average steady-state error iq / Imax: 0.13 %
+Error in episode 0: Id = 603.58 % / Iq = 132.22 %
+Error in episode 2: Id = 13.03 % / Iq = 15.12 %
+Error in episode 3: Id = 150.88 % / Iq = 177.10 %
+Error in episode 4: Id = 576.42 % / Iq = 81.23 %
+Model: PMSMTC - Reward function: absolute - Episodes: 5
+Average settling steps: 7.00 [steps]
+Average settling time: 0.70 [ms]
+Average overshoot id: 0.43 %
+Average overshoot iq: 0.00 %
+Average undershoot id: 0.00 %
+Average undershoot iq: 0.00 %
+Average steady-state error id / reference: 4918.65 %
+Average steady-state error iq / reference: 85.89 %
+Average steady-state error id / Imax: 0.17 %
+Average steady-state error iq / Imax: 0.17 %
+Error in episode 0: Id = 193.57 % / Iq = 74.26 %
+Error in episode 2: Id = 86.22 % / Iq = 65.96 %
+Error in episode 3: Id = 119.68 % / Iq = 183.80 %
+Error in episode 4: Id = 24187.73 % / Iq = 97.44 %
+Model: PMSMTC - Reward function: absolute - Episodes: 5
+Average settling steps: 3.00 [steps]
+Average settling time: 0.30 [ms]
+Average overshoot id: 2.09 %
+Average overshoot iq: 0.00 %
+Average undershoot id: 0.00 %
+Average undershoot iq: 0.00 %
+Average steady-state error id / reference: 148.57 %
+Average steady-state error iq / reference: 462.27 %
+Average steady-state error id / Imax: 0.35 %
+Average steady-state error iq / Imax: 0.35 %
+Error in episode 0: Id = 203.11 % / Iq = 868.16 %
+Error in episode 2: Id = 192.45 % / Iq = 391.99 %
+Error in episode 3: Id = 84.96 % / Iq = 801.66 %
+Error in episode 4: Id = 261.40 % / Iq = 248.21 %

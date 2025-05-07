@@ -32,39 +32,39 @@ train_data_folder = 'train_data'
 files_train = glob.glob(f'{train_data_folder}/*.csv')
 files_train.sort()
 
-fig, ax = plt.subplots()
-fig.set_figheight(9)
-fig.set_figwidth(15)
-# ax.set_ylabel(r'\textbf{Average reward}')
-# ax.set_xlabel(r'\textbf{Episode}')
-ax.set_ylabel(r'Average reward')
-ax.set_xlabel(r'Episode')
-legend_list = []
-for idx, file in enumerate(files_train):
-    color = colors[idx % 7]
-    data = pd.read_csv(file, header=0)
-    data = data.values.flatten()
-    ax.plot(data)
+# fig, ax = plt.subplots()
+# fig.set_figheight(9)
+# fig.set_figwidth(15)
+# # ax.set_ylabel(r'\textbf{Average reward}')
+# # ax.set_xlabel(r'\textbf{Episode}')
+# ax.set_ylabel(r'Average reward')
+# ax.set_xlabel(r'Episode')
+# legend_list = []
+# for idx, file in enumerate(files_train):
+#     color = colors[idx % 7]
+#     data = pd.read_csv(file, header=0)
+#     data = data.values.flatten()
+#     ax.plot(data)
     
-    filename = file.split('.csv')[0]
-    legend_text = " ".join(filename.split("_")[filename.split("_").index("PMSM") + 1:])
-    legend_list.append(mpatches.Patch(color=color, label=legend_text))
-ax.legend(handles=legend_list, loc="center left", bbox_to_anchor=(1, 0.5))
-plt.grid(True, 
-         which='both',      # 'major', 'minor', or 'both'
-         linestyle='--',    # Line style: '-', '--', '-.', ':'
-         linewidth=0.5,     # Line thickness
-         color='gray',     # Line color
-         alpha=0.5)        # Transparency (0-1)
-plt.tight_layout()
-fig.savefig("Train_average_reward.pdf")
+#     filename = file.split('.csv')[0]
+#     legend_text = " ".join(filename.split("_")[filename.split("_").index("PMSM") + 1:])
+#     legend_list.append(mpatches.Patch(color=color, label=legend_text))
+# ax.legend(handles=legend_list, loc="center left", bbox_to_anchor=(1, 0.5))
+# plt.grid(True, 
+#          which='both',      # 'major', 'minor', or 'both'
+#          linestyle='--',    # Line style: '-', '--', '-.', ':'
+#          linewidth=0.5,     # Line thickness
+#          color='gray',     # Line color
+#          alpha=0.5)        # Transparency (0-1)
+# plt.tight_layout()
+# fig.savefig("Train_average_reward.pdf")
 
 # Testing data
 I_max = 300
 
 test_data_folder = 'test_data'
-files_Id = glob.glob(f'{test_data_folder}/*Id*.csv')
-files_Iq = glob.glob(f'{test_data_folder}/*Iq*.csv')
+files_Id = glob.glob(f'{test_data_folder}/*PMSM_*Id*.csv')
+files_Iq = glob.glob(f'{test_data_folder}/*PMSM_*Iq*.csv')
 files_Id.sort()
 files_Iq.sort()
 
@@ -82,7 +82,7 @@ legend_list = []
 for idx, file in enumerate(files_Id):
     color = colors[idx % 7]
     data = pd.read_csv(file, header=0)
-    data_values = data.values.transpose().reshape(8000*5,4)
+    data_values = data.values.transpose().reshape(4000*5,4)
 
     data_name = (data.keys().to_list()[0]).split(" = ")[0]
     data_labels = [float(header.split(" = ")[-1]) for header in data.keys().to_list()]
@@ -96,12 +96,12 @@ for idx, file in enumerate(files_Id):
                  10 + idx*box_width,
                  15 + idx*box_width]
     
-    bplot = ax.boxplot(data_values,
+    bplot = ax.boxplot(data_values[data_values != -10],
                     positions=positions,
                     patch_artist=True,  # fill with color
                     meanline=True,
                     showmeans=True,
-                    showfliers=False,
+                    showfliers=True,
                     medianprops={'linewidth': 1.5},
                     meanprops={'linewidth': 1.5})
     
@@ -158,7 +158,7 @@ legend_list = []
 for idx, file in enumerate(files_Iq):
     color = colors[idx % 7]
     data = pd.read_csv(file, header=0)
-    data_values = data.values.transpose().reshape(8000*5,4)
+    data_values = data.values.transpose().reshape(4000*5,4)
 
     data_name = (data.keys().to_list()[0]).split(" = ")[0]
     data_labels = [float(header.split(" = ")[-1]) for header in data.keys().to_list()]
@@ -178,7 +178,7 @@ for idx, file in enumerate(files_Iq):
                     patch_artist=True,  # fill with color
                     meanline=True,
                     showmeans=True,
-                    showfliers=False,
+                    showfliers=True,
                     medianprops={'linewidth': 1.5},
                     meanprops={'linewidth': 1.5})
     # fill with colors
