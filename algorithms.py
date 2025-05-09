@@ -125,7 +125,7 @@ def run_test_1(env_config, model, vec_env, sys_params_dict, env_name, plot_figs=
 
         action_list = []
         reward_list = []
-        state_list = [obs[0][0:2] if env_name == "LoadRL" else obs[0][0:4]]
+        state_list = [obs.flatten()[0:2] if env_name == "LoadRL" else (obs.flatten()[0:5] if env_name == "PMSMTCABC" else obs.flatten()[0:4])]
         
         # Run episode
         done = False
@@ -134,7 +134,7 @@ def run_test_1(env_config, model, vec_env, sys_params_dict, env_name, plot_figs=
             obs, rewards, done, info = vec_env.step(action)
             if not done:
                 action_list.append(action[0])
-                state_list.append(obs[0][0:2] if env_name == "LoadRL" else obs[0][0:4])
+                state_list.append(obs.flatten()[0:2] if env_name == "LoadRL" else (obs.flatten()[0:5] if env_name == "PMSMTCABC" else obs.flatten()[0:4]))
                 reward_list.append(rewards[0])
         
         # Transform lists to numpy arrays

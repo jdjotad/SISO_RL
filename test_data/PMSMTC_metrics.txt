@@ -1,0 +1,16 @@
+Model: PMSMTC - Reward function: absolute - Episodes: 5
+Average settling steps: 5.60 [steps]
+Average settling time: 0.56 [ms]
+Average overshoot id: 2.28 %
+Average overshoot iq: 0.00 %
+Average undershoot id: 0.00 %
+Average undershoot iq: 0.00 %
+Average steady-state error id / reference: 307.27 %
+Average steady-state error iq / reference: 82.20 %
+Average steady-state error id / Imax: 0.16 %
+Average steady-state error iq / Imax: 0.16 %
+Error in episode 0: Id = 52.45 % / Iq = 41.74 %
+Error in episode 1: Id = 40.50 % / Iq = 61.11 %
+Error in episode 2: Id = 80.97 % / Iq = 41.40 %
+Error in episode 3: Id = 120.94 % / Iq = 183.00 %
+Error in episode 4: Id = 1241.48 % / Iq = 83.75 %

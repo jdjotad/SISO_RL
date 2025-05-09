@@ -867,30 +867,59 @@ class PlotUtility:
         fig.set_figheight(6)
         fig.set_figwidth(10)
         
-        # Plot State
-        ax = plt.subplot(131)
-        ax.set_title("State vs step")
         if env_name == "PMSMTC":
+            # Plot State
+            ax = plt.subplot(131)
+            ax.set_title("State vs step")
+            ax.plot(observations, label=['Te', 'Teref', 'Id', 'Iq'])
+
             if mtpa is not None:
-                ax.plot(observations, label=['Te', 'Teref', 'Id', 'Iq'])
                 mtpa = np.ones((observations.shape[0],1)) * mtpa
                 ax.plot(mtpa, "--", label=['Id MTPA', 'Iq MTPA'])
-            else:
-                ax.plot(observations, label=['Te', 'Teref', 'Id', 'Iq'])
+            self._adjust_subplot_layout(ax)
+            ax.legend(loc='lower center', bbox_to_anchor=(0.5, -0.25),
+                        ncol=2, fancybox=True, shadow=True)
+            # Plot action
+            ax = plt.subplot(132)
+            ax.set_title("Action vs step")
+            ax.plot(actions, label=['Vd', 'Vq'])
+            self._adjust_subplot_layout(ax)
+            ax.legend(loc='lower center', bbox_to_anchor=(0.5, -0.25),
+                        ncol=2, fancybox=True, shadow=True) 
+        elif env_name == "PMSMTCABC":
+            # Plot State
+            ax = plt.subplot(131)
+            ax.set_title("State vs step")
+            ax.plot(observations, label=['Te', 'Teref', 'Ia', 'Ib', 'Ic'])
+
+            if mtpa is not None:
+                mtpa = np.ones((observations.shape[0],1)) * mtpa
+                ax.plot(mtpa, "--", label=['Id MTPA', 'Iq MTPA'])
+            self._adjust_subplot_layout(ax)
+            ax.legend(loc='lower center', bbox_to_anchor=(0.5, -0.25),
+                        ncol=3, fancybox=True, shadow=True)
+            # Plot action
+            ax = plt.subplot(132)
+            ax.set_title("Action vs step")
+            ax.plot(actions, label=['Va', 'Vb', 'Vc'])
+            self._adjust_subplot_layout(ax)
+            ax.legend(loc='lower center', bbox_to_anchor=(0.5, -0.25),
+                        ncol=2, fancybox=True, shadow=True)
         else:
+            # Plot State
+            ax = plt.subplot(131)
+            ax.set_title("State vs step")
             ax.plot(observations, label=['Id', 'Iq', 'Idref', 'Iqref'])
-        
-        self._adjust_subplot_layout(ax)
-        ax.legend(loc='lower center', bbox_to_anchor=(0.5, -0.25),
-                  ncol=2, fancybox=True, shadow=True)
-        
-        # Plot action
-        ax = plt.subplot(132)
-        ax.set_title("Action vs step")
-        ax.plot(actions, label=['Vd', 'Vq'])
-        self._adjust_subplot_layout(ax)
-        ax.legend(loc='lower center', bbox_to_anchor=(0.5, -0.25),
-                  ncol=2, fancybox=True, shadow=True)
+            self._adjust_subplot_layout(ax)
+            ax.legend(loc='lower center', bbox_to_anchor=(0.5, -0.25),
+                        ncol=2, fancybox=True, shadow=True)
+            # Plot action
+            ax = plt.subplot(132)
+            ax.set_title("Action vs step")
+            ax.plot(actions, label=['Vd', 'Vq'])
+            self._adjust_subplot_layout(ax)
+            ax.legend(loc='lower center', bbox_to_anchor=(0.5, -0.25),
+                        ncol=2, fancybox=True, shadow=True)
         
         # Plot reward
         ax = plt.subplot(133)

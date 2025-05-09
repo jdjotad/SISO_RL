@@ -792,12 +792,8 @@ class EnvPMSMTC(gym.Env):
         self.id = self.i_max * id_norm
         self.iq = self.i_max * iq_norm
         self.te_ref = self.te_max * te_ref_norm
-        
-        # Convert dq currents to abc currents
-        self.ia, self.ib, self.ic = self.transformer.dq0_to_abc_direct(
-            self.id, self.iq, 0, self.theta_e
-        )
-        
+        self.we = we
+
         # Calculate torque
         te_norm = self.te_calculation(self.id, self.iq) / self.te_max
         
@@ -809,20 +805,8 @@ class EnvPMSMTC(gym.Env):
                 obs, _, _, _, _ = self.step(action=self.action_space.sample())
             return obs, {}
         else:
-            # Create observation if previous voltages were set
-            ia_norm = self.ia / self.i_max
-            ib_norm = self.ib / self.i_max
-            ic_norm = self.ic / self.i_max
-            prev_vd_norm = self.prev_vd / self.vdq_max
-            prev_vq_norm = self.prev_vq / self.vdq_max
-            
             # Observation: [te, te_ref, id, iq, we, prev_vd, prev_vq]
-            obs = np.array([
-                te_norm, te_ref_norm,
-                ia_norm, ib_norm, ic_norm,
-                we_norm,
-                prev_vd_norm, prev_vq_norm
-            ], dtype=np.float32)
+            obs = np.array([te_norm, te_ref_norm, id_norm, iq_norm,  we_norm, prev_vd_norm, prev_vq_norm], dtype=np.float32)
         
         info = {}
         info['mtpa_id'], info['mtpa_iq'] = self.mtpa()
@@ -1215,29 +1199,30 @@ class EnvPMSMTCABC(gym.Env):
         self.min_ib, self.max_ib = [-1.0, 1.0]
         self.min_ic, self.max_ic = [-1.0, 1.0]
         self.min_we, self.max_we = [-1.0, 1.0]
+        self.min_theta_e, self.max_theta_e = [-1.0, 1.0]
         self.min_va, self.max_va = [-1.0, 1.0]
         self.min_vb, self.max_vb = [-1.0, 1.0]
         self.min_vc, self.max_vc = [-1.0, 1.0]
         
-        # Observation bounds arrays: [te, te_ref, ia, ib, ic, we, prev_va, prev_vb, prev_vc]
+        # Observation bounds arrays: [te, te_ref, ia, ib, ic, we, theta_e, prev_va, prev_vb, prev_vc]
         self.low_observations = np.array(
             [self.min_te, self.min_ref_te, 
              self.min_ia, self.min_ib, self.min_ic, 
-             self.min_we, 
+             self.min_we, self.min_theta_e,
              self.min_va, self.min_vb, self.min_vc], 
             dtype=np.float32
         )
         self.high_observations = np.array(
             [self.max_te, self.max_ref_te, 
              self.max_ia, self.max_ib, self.max_ic, 
-             self.max_we, 
+             self.max_we, self.max_theta_e,
              self.max_va, self.max_vb, self.max_vc], 
             dtype=np.float32
         )
         
         # Create observation space
         self.observation_space = spaces.Box(
-            low=self.low_observations, high=self.high_observations, shape=(9,), dtype=np.float32
+            low=self.low_observations, high=self.high_observations, shape=(10,), dtype=np.float32
         )
 
     def step(self, action):
@@ -1381,12 +1366,13 @@ class EnvPMSMTCABC(gym.Env):
         prev_va_norm = self.prev_va / self.vabc_max
         prev_vb_norm = self.prev_vb / self.vabc_max
         prev_vc_norm = self.prev_vc / self.vabc_max
-        
+        theta_e_norm = (self.theta_e - np.pi) / np.pi
+
         # Construct observation vector
         obs = np.array([
             te_norm, te_ref_norm,
             ia_norm, ib_norm, ic_norm,
-            we_norm,
+            we_norm, theta_e_norm,
             prev_va_norm, prev_vb_norm, prev_vc_norm
         ], dtype=np.float32)
         
@@ -1451,7 +1437,7 @@ class EnvPMSMTCABC(gym.Env):
         
         # Weighting factors
         w_iabc = 0.1  # Weight for current magnitude
-        w_dq_const = 0.2  # Weight for dq constancy
+        w_dq_const = 0  # Weight for dq constancy
         
         # Calculate reward based on selected reward function type
         if self.reward_function == "absolute":
@@ -1620,12 +1606,13 @@ class EnvPMSMTCABC(gym.Env):
         prev_va_norm = self.prev_va / self.vabc_max
         prev_vb_norm = self.prev_vb / self.vabc_max
         prev_vc_norm = self.prev_vc / self.vabc_max
-        
+        theta_e_norm = (self.theta_e - np.pi) / np.pi
+
         # Observation: [te, te_ref, ia, ib, ic, we, prev_va, prev_vb, prev_vc]
         obs = np.array([
             te_norm, te_ref_norm,
             ia_norm, ib_norm, ic_norm,
-            we_norm,
+            we_norm, theta_e_norm,
             prev_va_norm, prev_vb_norm, prev_vc_norm
         ], dtype=np.float32)
         

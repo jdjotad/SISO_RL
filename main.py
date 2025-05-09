@@ -146,7 +146,7 @@ def main():
         "PMSMTC": {
             "name": f"PMSM torque control / Delta Vdq penalty / Reward {args.reward_function}",
             "max_episode_steps": 200,
-            "max_episodes": 3_000,
+            "max_episodes": 1_000,
             "reward": args.reward_function,
             "model_name": f"ddpg_EnvPMSMTC_{args.reward_function}"
         },
@@ -159,7 +159,7 @@ def main():
         },
         "PMSMTCABC": {
             "name": f"PMSM torque control with ABC / Delta Vdq penalty / Reward {args.reward_function}",
-            "max_episode_steps": 200,
+            "max_episode_steps": 500,
             "max_episodes": 3_000,
             "reward": args.reward_function,
             "model_name": f"ddpg_EnvPMSMTCABC_{args.reward_function}"

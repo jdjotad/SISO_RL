@@ -1,0 +1,32 @@
+Model: PMSMTCABC - Reward function: absolute - Episodes: 5
+Average settling steps: 199.00 [steps]
+Average settling time: 19.90 [ms]
+Average overshoot id: 0.00 %
+Average overshoot iq: 0.00 %
+Average undershoot id: 0.00 %
+Average undershoot iq: 0.00 %
+Average steady-state error id / reference: 89.61 %
+Average steady-state error iq / reference: 75.04 %
+Average steady-state error id / Imax: 0.16 %
+Average steady-state error iq / Imax: 0.16 %
+Error in episode 0: Id = 22.73 % / Iq = 16.62 %
+Error in episode 1: Id = 44.17 % / Iq = 30.79 %
+Error in episode 2: Id = 72.71 % / Iq = 55.79 %
+Error in episode 3: Id = 188.50 % / Iq = 73.93 %
+Error in episode 4: Id = 119.96 % / Iq = 198.05 %
+Model: PMSMTCABC - Reward function: absolute - Episodes: 5
+Average settling steps: 122.00 [steps]
+Average settling time: 12.20 [ms]
+Average overshoot id: 2.22 %
+Average overshoot iq: 0.00 %
+Average undershoot id: 0.00 %
+Average undershoot iq: 0.00 %
+Average steady-state error id / reference: 108.88 %
+Average steady-state error iq / reference: 79.24 %
+Average steady-state error id / Imax: 0.16 %
+Average steady-state error iq / Imax: 0.16 %
+Error in episode 0: Id = 75.53 % / Iq = 32.52 %
+Error in episode 1: Id = 27.61 % / Iq = 13.99 %
+Error in episode 2: Id = 57.79 % / Iq = 62.13 %
+Error in episode 3: Id = 264.16 % / Iq = 90.80 %
+Error in episode 4: Id = 119.33 % / Iq = 196.77 %
