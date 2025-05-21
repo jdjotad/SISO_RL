@@ -29,6 +29,10 @@ def parse_arguments():
                         choices=choices["env_name"], help='Environment name')
     parser.add_argument("--reward_function", nargs='?', type=str, default="quadratic",
                         choices=choices["reward_function"], help='Reward function type')
+    parser.add_argument("--weight_idq", nargs='?', type=float, default=0.1,
+                            help='Weight value for idq penalty')
+    parser.add_argument("--weight_vdq", nargs='?', type=float, default=0.1,
+                            help='Weight value for vdq penalty')
     parser.add_argument("--job_id", nargs='?', type=str, default="")
     parser.add_argument("--train", action=argparse.BooleanOptionalAction)
     parser.add_argument("--test_1", action=argparse.BooleanOptionalAction)
@@ -120,6 +124,9 @@ def main():
     # Configure system parameters
     sys_params_dict = configure_system_parameters(args.env_name, args.reward_function)
     
+    w_idq_string = str(args.weight_idq).replace('.', '_')
+    w_vdq_string = str(args.weight_vdq).replace('.', '_')
+    
     # Define environment configuration
     env_config = {
         "LoadRL": {
@@ -145,10 +152,12 @@ def main():
         },
         "PMSMTC": {
             "name": f"PMSM torque control / Delta Vdq penalty / Reward {args.reward_function}",
-            "max_episode_steps": 200,
-            "max_episodes": 1_000,
+            "max_episode_steps": 500, # 200
+            "max_episodes": 2_000, # 1000
             "reward": args.reward_function,
-            "model_name": f"ddpg_EnvPMSMTC_{args.reward_function}"
+            "model_name": f"ddpg_EnvPMSMTC_widq_{w_idq_string}_wvdq_{w_vdq_string}_{args.reward_function}"
+            # "model_name": f"ddpg_EnvPMSMTC_{args.reward_function}"
+
         },
         "PMSMDataBased": {
             "name": f"PMSM data based / Delta Vdq penalty / Reward {args.reward_function}",
@@ -160,7 +169,7 @@ def main():
         "PMSMTCABC": {
             "name": f"PMSM torque control with ABC / Delta Vdq penalty / Reward {args.reward_function}",
             "max_episode_steps": 500,
-            "max_episodes": 3_000,
+            "max_episodes": 10_000,
             "reward": args.reward_function,
             "model_name": f"ddpg_EnvPMSMTCABC_{args.reward_function}"
         }
@@ -170,7 +179,7 @@ def main():
     env_sel = env_config[args.env_name]
     
     # Setup the environment and model
-    env, model, vec_env = setup_environment(args.env_name, env_sel, sys_params_dict)
+    env, model, vec_env = setup_environment(args.env_name, env_sel, sys_params_dict, args.weight_idq, args.weight_vdq)
     
     # Run train or tests based on arguments
     if args.train:

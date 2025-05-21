@@ -11,9 +11,9 @@ from stable_baselines3.common.noise import NormalActionNoise
 
 # Import your environment modules
 from environments import EnvLoadRL, EnvLoad3RL, EnvPMSM, EnvPMSMTC, EnvPMSMDataBased, EnvPMSMTCABC
-from utils import PerformanceMetrics, RewardLoggingCallback, PlotUtility
+from utils_local import PerformanceMetrics, RewardLoggingCallback, PlotUtility
 
-def setup_environment(env_name, env_config, sys_params_dict):
+def setup_environment(env_name, env_config, sys_params_dict, w_idq=0.1, w_vdq=0.1):
     """Setup the environment and model for training or testing."""
     # Create environment based on environment name
     env_classes = {
@@ -26,7 +26,7 @@ def setup_environment(env_name, env_config, sys_params_dict):
     }
     
     # Create environment
-    env = env_classes[env_name](sys_params=sys_params_dict)
+    env = env_classes[env_name](sys_params=sys_params_dict, w_idq=w_idq, w_vdq=w_vdq)
     env = gym.wrappers.TimeLimit(env, env_config["max_episode_steps"])
     env = gym.wrappers.RecordEpisodeStatistics(env)
     
@@ -65,7 +65,7 @@ def train_model(env_config, model, env_name, reward_function, job_id, use_wandb=
     
     # Setup reward callback to log rewards
     reward_callback = RewardLoggingCallback(
-        csv_file=f"train_{env_name}_{reward_function}.csv", 
+        csv_file=f"train_data/train_{env_name}_{reward_function}.csv", 
         log_interval=25
     )
     
@@ -109,10 +109,13 @@ def run_test_1(env_config, model, vec_env, sys_params_dict, env_name, plot_figs=
     ss_error_iq_arr_imax = np.zeros(test_max_episodes)
     
     high_error_episodes = []
-    
+
+    # Set seed for reproducibility
+    seed = 0
+    vec_env.seed(seed=seed)
+
     # Run test episodes
     for episode in range(test_max_episodes):
-        vec_env.seed(seed=episode)
         # vec_env.set_options({
         #     "id_norm": 0.8563502430915833,
         #     "iq_norm": -0.342145174741745,
@@ -392,7 +395,7 @@ def run_test_3(env_name, env_sel, reward_function, model, vec_env, sys_params_di
     
     # Initialize plotting if needed
     if plot_figs:
-        from utils import PlotUtility
+        from utils_local import PlotUtility
         plot = PlotUtility()
     else:
         plot = None
@@ -417,7 +420,11 @@ def run_test_3(env_name, env_sel, reward_function, model, vec_env, sys_params_di
     
     # Ensure test_data directory exists
     os.makedirs('test_data', exist_ok=True)
-    
+
+    # Set seed for reproducibility
+    seed = 0
+    vec_env.seed(seed=seed)
+
     if env_name in ["PMSM", "PMSMDataBased"]:
         # Initialize arrays for storing results
         error_data_id_ref = np.zeros((episodes, 1))
@@ -427,9 +434,9 @@ def run_test_3(env_name, env_sel, reward_function, model, vec_env, sys_params_di
         id_ref_norm_array = np.zeros((episodes, 1))
         iq_ref_norm_array = np.zeros((episodes, 1))
         
+
         # Run episodes
         for episode in tqdm(range(episodes)):
-            vec_env.seed(seed=episode)
             obs = vec_env.reset()
             id0, iq0 = (obs.flatten()[0], obs.flatten()[1])
             id_ref, iq_ref = (obs.flatten()[2], obs.flatten()[3])
@@ -494,7 +501,6 @@ def run_test_3(env_name, env_sel, reward_function, model, vec_env, sys_params_di
         
         # Run episodes
         for episode in tqdm(range(episodes)):
-            vec_env.seed(seed=episode)
             obs = vec_env.reset()
             te0, te_ref = (obs.flatten()[0], obs.flatten()[1])
             id0, iq0 = (obs.flatten()[2], obs.flatten()[3])

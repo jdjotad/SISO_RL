@@ -359,7 +359,7 @@ class PowerElectronicsHardware:
         """
         
         # Initialize component objects
-        clarke_park = ClarkeParTransform()
+        clarke_park = ClarkeParkTransform()
         pwm_controller = PulseWidthModulation(dc_voltage, carrier_steps, pwm_strategy)
         inverter = TwoLevelInverter(dc_voltage)
         

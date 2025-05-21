@@ -14,3 +14,99 @@ Error in episode 1: Id = 40.50 % / Iq = 61.11 %
 Error in episode 2: Id = 80.97 % / Iq = 41.40 %
 Error in episode 3: Id = 120.94 % / Iq = 183.00 %
 Error in episode 4: Id = 1241.48 % / Iq = 83.75 %
+Model: PMSMTC - Reward function: absolute - Episodes: 5
+Average settling steps: 5.40 [steps]
+Average settling time: 0.54 [ms]
+Average overshoot id: 3.86 %
+Average overshoot iq: 0.00 %
+Average undershoot id: 0.00 %
+Average undershoot iq: 0.00 %
+Average steady-state error id / reference: 228.65 %
+Average steady-state error iq / reference: 110.91 %
+Average steady-state error id / Imax: 0.17 %
+Average steady-state error iq / Imax: 0.17 %
+Error in episode 0: Id = 297.25 % / Iq = 109.72 %
+Error in episode 1: Id = 14.68 % / Iq = 22.18 %
+Error in episode 2: Id = 153.78 % / Iq = 84.33 %
+Error in episode 3: Id = 125.81 % / Iq = 247.42 %
+Error in episode 4: Id = 551.73 % / Iq = 90.88 %
+Model: PMSMTC - Reward function: absolute - Episodes: 5
+Average settling steps: 1.40 [steps]
+Average settling time: 0.14 [ms]
+Average overshoot id: 0.06 %
+Average overshoot iq: 0.00 %
+Average undershoot id: 0.00 %
+Average undershoot iq: 0.00 %
+Average steady-state error id / reference: 663.69 %
+Average steady-state error iq / reference: 5685.30 %
+Average steady-state error id / Imax: 0.25 %
+Average steady-state error iq / Imax: 0.25 %
+Error in episode 0: Id = 34.83 % / Iq = 54.80 %
+Error in episode 1: Id = 220.26 % / Iq = 4249.84 %
+Error in episode 2: Id = 2463.36 % / Iq = 37.95 %
+Error in episode 3: Id = 340.55 % / Iq = 131.76 %
+Error in episode 4: Id = 259.47 % / Iq = 23952.16 %
+Model: PMSMTC - Reward function: absolute - Episodes: 5
+Average settling steps: 2.20 [steps]
+Average settling time: 0.22 [ms]
+Average overshoot id: 0.00 %
+Average overshoot iq: 0.00 %
+Average undershoot id: 0.00 %
+Average undershoot iq: 0.00 %
+Average steady-state error id / reference: 247.16 %
+Average steady-state error iq / reference: 254.82 %
+Average steady-state error id / Imax: 0.25 %
+Average steady-state error iq / Imax: 0.25 %
+Error in episode 0: Id = 226.16 % / Iq = 89.82 %
+Error in episode 1: Id = 270.79 % / Iq = 614.90 %
+Error in episode 2: Id = 42.48 % / Iq = 11.14 %
+Error in episode 3: Id = 473.79 % / Iq = 112.68 %
+Error in episode 4: Id = 222.59 % / Iq = 445.54 %
+Model: PMSMTC - Reward function: absolute - Episodes: 5
+Average settling steps: 2.40 [steps]
+Average settling time: 0.24 [ms]
+Average overshoot id: 0.00 %
+Average overshoot iq: 0.00 %
+Average undershoot id: 0.00 %
+Average undershoot iq: 0.00 %
+Average steady-state error id / reference: 388.59 %
+Average steady-state error iq / reference: 450.48 %
+Average steady-state error id / Imax: 0.27 %
+Average steady-state error iq / Imax: 0.27 %
+Error in episode 0: Id = 55.02 % / Iq = 45.72 %
+Error in episode 1: Id = 191.94 % / Iq = 903.69 %
+Error in episode 2: Id = 42.16 % / Iq = 11.71 %
+Error in episode 3: Id = 1491.99 % / Iq = 102.85 %
+Error in episode 4: Id = 161.83 % / Iq = 1188.46 %
+Model: PMSMTC - Reward function: absolute - Episodes: 5
+Average settling steps: 2.40 [steps]
+Average settling time: 0.24 [ms]
+Average overshoot id: 0.01 %
+Average overshoot iq: 0.00 %
+Average undershoot id: 0.00 %
+Average undershoot iq: 0.00 %
+Average steady-state error id / reference: 624.36 %
+Average steady-state error iq / reference: 248.63 %
+Average steady-state error id / Imax: 0.23 %
+Average steady-state error iq / Imax: 0.23 %
+Error in episode 0: Id = 19.80 % / Iq = 24.18 %
+Error in episode 1: Id = 228.18 % / Iq = 434.01 %
+Error in episode 2: Id = 23.93 % / Iq = 8.71 %
+Error in episode 3: Id = 2676.06 % / Iq = 90.28 %
+Error in episode 4: Id = 173.82 % / Iq = 685.95 %
+Model: PMSMTC - Reward function: absolute - Episodes: 5
+Average settling steps: 2.20 [steps]
+Average settling time: 0.22 [ms]
+Average overshoot id: 0.38 %
+Average overshoot iq: 0.00 %
+Average undershoot id: 0.00 %
+Average undershoot iq: 0.00 %
+Average steady-state error id / reference: 213.39 %
+Average steady-state error iq / reference: 1735.12 %
+Average steady-state error id / Imax: 0.23 %
+Average steady-state error iq / Imax: 0.23 %
+Error in episode 0: Id = 99.83 % / Iq = 51.14 %
+Error in episode 1: Id = 262.12 % / Iq = 506.69 %
+Error in episode 2: Id = 162.90 % / Iq = 63.08 %
+Error in episode 3: Id = 274.53 % / Iq = 71.93 %
+Error in episode 4: Id = 267.57 % / Iq = 7982.74 %
